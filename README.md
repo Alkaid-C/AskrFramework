@@ -246,3 +246,5 @@ gunicorn -w 1 --threads 8 -b 0.0.0.0:19218 askr_framework:NAPCAT_LISTENER
 **Askr Framework** - 让复杂的QQ机器人开发变得简单而有趣！
 
 现在就创建你的第一个插件，开始探索无限可能吧！ 
+
+声明：本项目的文档中包含AI生成的内容。
