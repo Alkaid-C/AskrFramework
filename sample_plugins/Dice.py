@@ -25,9 +25,9 @@ MANIFEST = {
 
 # 配置常量
 CONFIG = {
-    "database_path": "spring/spring.db",
-    "help_file": "spring/help.json", 
-    "madness_file": "spring/madness.json",
+    "database_path": "plugins/spring/spring.db",
+    "help_file": "plugins/help.json", 
+    "madness_file": "plugins/madness.json",
     "max_command_length": 30,
     "max_name_length": 30
 }
