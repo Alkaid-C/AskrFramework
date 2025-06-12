@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-"""
-Askr Framework - A middleware framework for QQ chatbot development
-Version: Beta 0.97
-License: GPL v3
-"""
 
 import json
 import os
@@ -23,6 +18,10 @@ import queue
 import hashlib
 from flask import Flask, request
 from typing import List, Dict, Optional, Union, Any, Callable
+import threading
+
+INIT_LOCK = threading.Lock()
+INITIALIZED = False
 
 EVENT_TYPES_: List[str] = [
     "MESSAGE_PRIVATE", "MESSAGE_GROUP", "MESSAGE_GROUP_MENTION", "MESSAGE_GROUP_BOT",
@@ -47,8 +46,8 @@ UNCONDITIONAL_REGISTRY = []  # type: List[tuple[callable, int]]
 INITIALIZER_REGISTRY = []  # type: List[tuple[callable, str]]
 
 CONFIG = {
-    'NAPCAT_SERVER': {'api_url': 'http://localhost:3001'},
-    'NAPCAT_LISTEN': {'host': '0.0.0.0', 'port': 8080},
+    'NAPCAT_SERVER': {'api_url': 'http://localhost:29217'},
+    'NAPCAT_LISTEN': {'host': '0.0.0.0', 'port': 29218},
     'PATHS': {
         'plugins_dir': './plugins',
         'history_dir': './MessageHistory',  # Legacy
@@ -67,10 +66,10 @@ CONFIG = {
         'process_creation_method': 'spawn'
     },
     'ADMIN_NOTIFICATION': {
-        'enabled': False,
-        'admin_qq': 0,
-        'notify_level': 'ERROR',
-        'rate_limit_seconds': 300,
+        'enabled': True,
+        'admin_qq': 999999999,
+        'notify_level': 'WARNING',
+        'rate_limit_seconds': 1,
         'message_format': '🚨 Askr Alert 🚨\n[{level}] {time}\n{message}'
     }
 }
@@ -264,7 +263,8 @@ def DatabaseInitializer() -> None:
         logging.info(f"Database initialized successfully at {dbPath}")
         
     except Exception as e:
-        logging.error(f"Failed to initialize database: {e}")
+        logging.critical(f"Failed to initialize database: {e}")
+        sys.exit(1)
 
 def UnconditionalScheduler() -> None:
     logging.info("Starting UNCONDITIONAL scheduler")
@@ -307,14 +307,14 @@ def Initializer() -> None:
         logging.info(f"Created plugins directory: {pluginsDir}")
     
     if not os.path.isdir(pluginsDir):
-        logging.error(f"Plugins path is not a directory: {pluginsDir}")
-        return
+        logging.critical(f"Plugins path is not a directory: {pluginsDir}")
+        sys.exit(1)
         
     pluginFiles_ = [f for f in os.listdir(pluginsDir) if f.endswith('.py') and not f.startswith('__')]
     
     if not pluginFiles_:
-        logging.warning(f"No plugin files found in {pluginsDir}")
-        return
+        logging.critical(f"No plugin files found in {pluginsDir}")
+        sys.exit(1)
     
     logging.info(f"Found {len(pluginFiles_)} plugin files: {pluginFiles_}")
     
@@ -330,27 +330,27 @@ def Initializer() -> None:
             pluginModule = importlib.import_module(moduleName)
             
             if not hasattr(pluginModule, 'MANIFEST'):
-                logging.warning(f"Plugin {moduleName} has no MANIFEST, skipping")
+                logging.error(f"Plugin {moduleName} has no MANIFEST, skipping")
                 continue
                 
             manifest = getattr(pluginModule, 'MANIFEST')
             if not isinstance(manifest, dict):
-                logging.warning(f"Plugin {moduleName} MANIFEST is not a dict, skipping")
+                logging.error(f"Plugin {moduleName} MANIFEST is not a dict, skipping")
                 continue
             
             for eventType, functionName in manifest.items():
                 if eventType == "INITIALIZER":
                     if not isinstance(functionName, str):
-                        logging.warning(f"Plugin {moduleName} INITIALIZER must be string, skipping")
+                        logging.error(f"Plugin {moduleName} INITIALIZER must be string, skipping")
                         continue
                     
                     if not hasattr(pluginModule, functionName):
-                        logging.warning(f"Plugin {moduleName} declares INITIALIZER function '{functionName}' but it doesn't exist")
+                        logging.error(f"Plugin {moduleName} declares INITIALIZER function '{functionName}' but it doesn't exist")
                         continue
                         
                     handlerFunction = getattr(pluginModule, functionName)
                     if not callable(handlerFunction):
-                        logging.warning(f"Plugin {moduleName}.{functionName} is not callable")
+                        logging.error(f"Plugin {moduleName}.{functionName} is not callable")
                         continue
                     
                     sig = inspect.signature(handlerFunction)
@@ -359,7 +359,7 @@ def Initializer() -> None:
                     
                     unknownParams = actualParams - allowedParams
                     if unknownParams:
-                        logging.warning(f"Plugin {moduleName}.{functionName} has unknown parameters: {unknownParams}. "
+                        logging.error(f"Plugin {moduleName}.{functionName} has unknown parameters: {unknownParams}. "
                                       f"Allowed parameters are: {allowedParams}")
                         continue
                     
@@ -375,23 +375,23 @@ def Initializer() -> None:
                         if len(functionName) == 2:
                             handlerName, interval = functionName
                         else:
-                            logging.warning(f"Plugin {moduleName} UNCONDITIONAL has invalid format, skipping")
+                            logging.error(f"Plugin {moduleName} UNCONDITIONAL has invalid format, skipping")
                             continue
                     elif not isinstance(functionName, str):
-                        logging.warning(f"Plugin {moduleName} UNCONDITIONAL must be string or list, skipping")
+                        logging.error(f"Plugin {moduleName} UNCONDITIONAL must be string or list, skipping")
                         continue
                     
                     if not hasattr(pluginModule, handlerName):
-                        logging.warning(f"Plugin {moduleName} declares UNCONDITIONAL function '{handlerName}' but it doesn't exist")
+                        logging.error(f"Plugin {moduleName} declares UNCONDITIONAL function '{handlerName}' but it doesn't exist")
                         continue
                         
                     handlerFunction = getattr(pluginModule, handlerName)
                     if not callable(handlerFunction):
-                        logging.warning(f"Plugin {moduleName}.{handlerName} is not callable")
+                        logging.error(f"Plugin {moduleName}.{handlerName} is not callable")
                         continue
                     
                     if not isinstance(interval, int) or interval <= 0 or interval > 60:
-                        logging.warning(f"Plugin {moduleName} UNCONDITIONAL interval must be integer 1-60, got {interval}")
+                        logging.error(f"Plugin {moduleName} UNCONDITIONAL interval must be integer 1-60, got {interval}")
                         continue
                     
                     sig = inspect.signature(handlerFunction)
@@ -400,7 +400,7 @@ def Initializer() -> None:
                     
                     unknownParams = actualParams - allowedParams
                     if unknownParams:
-                        logging.warning(f"Plugin {moduleName}.{handlerName} has unknown parameters: {unknownParams}. "
+                        logging.error(f"Plugin {moduleName}.{handlerName} has unknown parameters: {unknownParams}. "
                                       f"Allowed parameters are: {allowedParams}")
                         continue
                     
@@ -410,16 +410,16 @@ def Initializer() -> None:
                 
                 # Regular event types
                 if eventType not in EVENT_TYPES_:
-                    logging.warning(f"Plugin {moduleName} declares invalid event type '{eventType}'. Valid types: {EVENT_TYPES_}")
+                    logging.error(f"Plugin {moduleName} declares invalid event type '{eventType}'. Valid types: {EVENT_TYPES_}")
                     continue
                     
                 if not hasattr(pluginModule, functionName):
-                    logging.warning(f"Plugin {moduleName} declares function '{functionName}' but it doesn't exist")
+                    logging.error(f"Plugin {moduleName} declares function '{functionName}' but it doesn't exist")
                     continue
                     
                 handlerFunction = getattr(pluginModule, functionName)
                 if not callable(handlerFunction):
-                    logging.warning(f"Plugin {moduleName}.{functionName} is not callable")
+                    logging.error(f"Plugin {moduleName}.{functionName} is not callable")
                     continue
                 
                 sig = inspect.signature(handlerFunction)
@@ -428,7 +428,7 @@ def Initializer() -> None:
                 
                 unknownParams = actualParams - allowedParams
                 if unknownParams:
-                    logging.warning(f"Plugin {moduleName}.{functionName} has unknown parameters: {unknownParams}. "
+                    logging.error(f"Plugin {moduleName}.{functionName} has unknown parameters: {unknownParams}. "
                                   f"Allowed parameters are: {allowedParams}")
                     continue
                 
@@ -455,7 +455,7 @@ def Initializer() -> None:
                 elif result is None:
                     logging.info(f"INITIALIZER for plugin {pluginName} completed successfully")
                 else:
-                    logging.warning(f"INITIALIZER for plugin {pluginName} returned unexpected result: {result}")
+                    logging.error(f"INITIALIZER for plugin {pluginName} returned unexpected result: {result}")
                     
             except Exception as e:
                 logging.error(f"INITIALIZER for plugin {pluginName} failed with exception: {e}")
@@ -507,7 +507,6 @@ def GroupMessageAnalyzer(rawEvent: Dict) -> str:
         if segment.get("type") == "at":
             atQQ = segment.get("data", {}).get("qq", "")
             if atQQ == selfId:
-                logging.debug(f"Group message classified as MESSAGE_GROUP_MENTION (bot @mentioned)")
                 return "MESSAGE_GROUP_MENTION"
     
     # Check command prefix in first text segment only
@@ -516,7 +515,6 @@ def GroupMessageAnalyzer(rawEvent: Dict) -> str:
             text = segment.get("data", {}).get("text", "")
             trimmedText = text.lstrip()
             if trimmedText and trimmedText[0] in ['.', '/', '\\']:
-                logging.debug(f"Group message classified as MESSAGE_GROUP_BOT (starts with '{trimmedText[0]}')")
                 return "MESSAGE_GROUP_BOT"
             break
     
@@ -1489,31 +1487,43 @@ def MainDispatcher(rawEvent: Dict) -> None:
         
         PluginCaller(all_handlers, simpleEvent, rawEvent, response_callback)
 
-NAPCAT_LISTENER = Flask(__name__)
+def InitializerGuard():
+    global INITIALIZED
+    if INITIALIZED:
+        return
+        
+    with INIT_LOCK:
+        if not INITIALIZED:
+            try:
+                multiprocessing.set_start_method(CONFIG['PLUGIN_EXECUTION']['process_creation_method'], force=True)
+            except Exception as e:
+                logging.critical(f"Failed to set multiprocessing start method: {e}")
+                sys.exit(1)
+            Initializer()
+            INITIALIZED = True
 
+NAPCAT_LISTENER = Flask(__name__)
 @NAPCAT_LISTENER.route('/', methods=['POST'])
 def NapCatListener() -> str:
+    InitializerGuard()  # 懒加载初始化
+    
     rawEvent = request.get_json()
     
-    # Priority 1: Admin commands (work even when muted)
     if AdminDispatcher(rawEvent):
         return 'OK'
     
-    # Priority 2: Check mute status
     if IS_MUTED:
         return 'OK'
     
-    # Priority 3: Normal event processing
     MainDispatcher(rawEvent)
     return 'OK'
 
-# Initialize for production deployment
-multiprocessing.set_start_method(CONFIG['PLUGIN_EXECUTION']['process_creation_method'], force=True)
-Initializer()
+
 
 if __name__ == '__main__':
-    # Development server
-    NAPCAT_LISTENER.run(
-        host=CONFIG['NAPCAT_LISTEN']['host'], 
-        port=CONFIG['NAPCAT_LISTEN']['port']
-    )
+    InitializerGuard()
+    try:
+        NAPCAT_LISTENER.run(host=CONFIG['NAPCAT_LISTEN']['host'], port=CONFIG['NAPCAT_LISTEN']['port'])
+    except Exception as e:
+        logging.critical(f"Failed to start HTTP server: {e}")
+        sys.exit(1)
