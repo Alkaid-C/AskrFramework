@@ -44,7 +44,7 @@ Askr Framework基于[NapCat](https://github.com/NapNeko/NapCatQQ)项目，专注
 
 | 框架 | 代码行数 | 编程语言 | 对新手开发者可能的难点 |
 |------|----------|----------|------------------------|
-| **Askr** | **3** | **Python** | **无** |
+| **Askr Framework** | **3** | **Python** | **无** |
 | Koishi | 5+配置文件 | TypeScript | **函数式编程**、**箭头函数**(=>) |
 | NcatBot | 5 | Python | **装饰器**(@)、**异步编程**(async/await) |
 | NoneBot2 | 6+配置文件 | Python | **装饰器**(@)、**异步编程**(async/await) |
