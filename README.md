@@ -192,7 +192,7 @@ gunicorn -w 1 --threads 8 -b 0.0.0.0:19218 askr_framework:NAPCAT_LISTENER
 
 [雷诺曼占卜](sample_plugins/Lenormand.py) --通过云端LLM API实现的雷诺曼占卜机器人
 
-[跑团骰娘](sample_plugins/Dice.py) -- COC跑团用骰娘，包含角色卡管理功能
+[跑团骰娘](sample_plugins/Dice.py) -- COC跑团用骰娘，实现了[溯回骰](https://github.com/Dice-Developer-Team/DiceV2Docs/blob/master/User_Manual.md)所支持的大多数功能。
 
 ---
 
