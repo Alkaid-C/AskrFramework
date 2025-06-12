@@ -66,11 +66,11 @@ CONFIG = {
         'process_creation_method': 'spawn'
     },
     'ADMIN_NOTIFICATION': {
-        'enabled': True,
+        'enabled': False,
         'admin_qq': 999999999,
         'notify_level': 'WARNING',
-        'rate_limit_seconds': 1,
-        'message_format': '🚨 Askr Alert 🚨\n[{level}] {time}\n{message}'
+        'rate_limit_seconds': 300,
+        'message_format': 'Alert \n[{level}] {time}\n{message}'
     }
 }
 
