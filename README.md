@@ -190,9 +190,9 @@ gunicorn -w 1 --threads 8 -b 0.0.0.0:19218 askr_framework:NAPCAT_LISTENER
 
 ### 示例插件库
 
-[雷诺曼占卜](sample_plugins/Lenormand.py) --通过云端LLM API实现的雷诺曼占卜机器人
-
-[跑团骰娘](sample_plugins/Dice.py) -- COC跑团用骰娘，实现了[溯回骰](https://github.com/Dice-Developer-Team/DiceV2Docs/blob/master/User_Manual.md)所支持的大多数功能。
+- [雷诺曼占卜](sample_plugins/Lenormand.py) --通过云端LLM API实现的雷诺曼占卜机器人。监听群聊消息，simpleEvent&rawEvent入参，string返回值。
+- [跑团骰娘](sample_plugins/Dice.py) -- COC跑团用骰娘，实现了[溯回骰](https://github.com/Dice-Developer-Team/DiceV2Docs/blob/master/User_Manual.md)所支持的大多数功能。监听初始化、私聊群聊消息，simpleEvent&rawEvent入参，string/dict/list返回值
+- [b站up主动态更新播报](sample_plugins/BiliDynamicsUpdate.py) -- 调用[bilibili-api](https://github.com/Nemo2011/bilibili-api/)，获取指定up主的动态更新，监听初始化、无条件事件，botContext入参，list返回值。
 
 ---
 
