@@ -7,10 +7,10 @@
         "sessdata": "****"#你的b站cookie
     },
     "target_groups": [
-        325229812 #粉丝群群号
+        123456789 #粉丝群群号
     ],
     "uid": 3546831533378448, #up的b站uid
-    "up_name": "埃瑟斯" #对up的称呼
+    "up_name": "up" #对up的称呼
 }
 """
 import json
