@@ -24,13 +24,12 @@ import sys
 from flask import Flask, request
 from typing import List, Dict, Optional, Union, Any, Callable, Set
 
-# Path to the framework configuration file
+# Configuration
 FRAMEWORK_CONFIG_FILE = './frameworkConfig.json'
 
-# Global initialization lock and flag
+# Global initialization control
 INIT_LOCK = threading.Lock()
 INITIALIZED = False
-
 
 # Event types definition
 EVENT_TYPES_ = [
@@ -56,7 +55,7 @@ EVENT_INHERITANCE = {
 # Plugin registries
 PLUGIN_REGISTRY = {}  # type: Dict[str, List[Any]]
 
-# Default configuration
+# Default configuration with sensible values for production use
 CONFIG = {
     'NAPCAT_SERVER': {'api_url': 'http://localhost:29218'}, 
     'NAPCAT_LISTEN': {'host': '0.0.0.0', 'port': 19219},
@@ -116,7 +115,6 @@ IS_MUTED = False
 LOGGING_LEVELS = {'DEBUG': 10, 'INFO': 20, 'WARNING': 30, 'ERROR': 40, 'CRITICAL': 50}
 AdminNotificationLast = {}  # Rate limiting: {messageHash: timestamp}
 AdminNotificationLock = threading.Lock()
-
 
 # Flask application
 NAPCAT_LISTENER = Flask(__name__)
@@ -187,7 +185,6 @@ def ActualInitializer() -> None:
     def FrameworkConfigReader() -> None:
         """Read and validate framework configuration from JSON file."""
         global CONFIG
-        # Check if config file exists
         
         configPath = FRAMEWORK_CONFIG_FILE
         if not os.path.exists(configPath) or not os.path.isfile(configPath):
@@ -195,18 +192,13 @@ def ActualInitializer() -> None:
             AdminNotifier('WARNING', f"Configuration file {configPath} does not exist, using defaults")
             return
         
-        # Start with default config
-
-            
         try:
-            # Read config file
             with open(configPath, 'r', encoding='utf-8') as configFile:
                 fileConfig = json.load(configFile)
             
             logger.info(f"Loaded configuration from {configPath}")
             AdminNotifier('INFO', f"Loaded configuration from {configPath}")
 
-            # Check version if present
             if 'version' in fileConfig:
                 logger.info(f"Configuration version: {fileConfig['version']}")
                 AdminNotifier('INFO', f"Configuration version: {fileConfig['version']}")
@@ -217,7 +209,7 @@ def ActualInitializer() -> None:
                     if isinstance(fileConfig['NAPCAT_SERVER']['api_url'], str):
                         CONFIG['NAPCAT_SERVER']['api_url'] = fileConfig['NAPCAT_SERVER']['api_url']
                     else:
-                        # In this case, AdminNotification system is not guaranteed to work, so we log a critical error and exit
+                        # Critical error - admin notification system may not work
                         logger.critical(f"Configuration file contains invalid type for NAPCAT_SERVER.api_url, expected str")
                         AdminNotifier('CRITICAL', f"Configuration file contains invalid type for NAPCAT_SERVER.api_url, expected str")
                         sys.exit(1)
@@ -228,7 +220,6 @@ def ActualInitializer() -> None:
                     if isinstance(fileConfig['NAPCAT_LISTEN']['host'], str):
                         CONFIG['NAPCAT_LISTEN']['host'] = fileConfig['NAPCAT_LISTEN']['host']
                     else:
-                        # In this case, AdminNotification system still works
                         logger.critical(f"Configuration file contains invalid type for NAPCAT_LISTEN.host, expected str, using default.")
                         AdminNotifier('CRITICAL', f"Configuration file contains invalid type for NAPCAT_LISTEN.host, expected str, using default.")
                 
@@ -237,7 +228,6 @@ def ActualInitializer() -> None:
                     if isinstance(port, int) and 1 <= port <= 65535:
                         CONFIG['NAPCAT_LISTEN']['port'] = port
                     else:
-                        # In this case, AdminNotification system still works
                         logger.critical(f"Configuration file contains invalid value for NAPCAT_LISTEN.port, must be int between 1-65535, using default.")
                         AdminNotifier('CRITICAL', f"Configuration file contains invalid value for NAPCAT_LISTEN.port, must be int between 1-65535, using default.")
             
@@ -372,7 +362,6 @@ def ActualInitializer() -> None:
                     logger.info(f"Created directory: {value}")
                     AdminNotifier('INFO', f"Created directory: {value}")
             
-            
             logger.info("Configuration loading completed successfully")
             AdminNotifier('INFO', "Configuration loading completed successfully")
             
@@ -404,7 +393,6 @@ def ActualInitializer() -> None:
                 AdminNotifier('ERROR', "Access control file must be a JSON object, using defaults")
                 return
             
-            # Validate version
             if 'version' in fileRules:
                 logger.info(f"Access control version: {fileRules['version']}")
                 AdminNotifier('INFO', f"Access control version: {fileRules['version']}")
@@ -580,7 +568,9 @@ def ActualInitializer() -> None:
             logger.critical(f"Failed to initialize database: {e}")
             AdminNotifier('CRITICAL', f"Failed to initialize database: {e}")
             sys.exit(1)
+
     def RegistryInitializer() -> None:
+        """Scan and load plugins, register event handlers."""
         global PLUGIN_REGISTRY
 
         PLUGIN_REGISTRY = {eventType: [] for eventType in EVENT_TYPES_}
@@ -783,7 +773,6 @@ def ActualInitializer() -> None:
                     handler for handler in PLUGIN_REGISTRY[eventType]
                     if handler.__module__ != pluginName
                 ]
-
             
             logger.error(f"Removed all functions for failed plugin: {pluginName}")
             AdminNotifier('ERROR', f"Removed all functions for failed plugin: {pluginName}")
@@ -808,9 +797,9 @@ def ActualInitializer() -> None:
             if handlerList:
                 logger.debug(f"  {eventType}: {len(handlerList)} handlers")
                 AdminNotifier('DEBUG', f"  {eventType}: {len(handlerList)} handlers")
+
     def UnconditionalEventInitializer() -> None:
         """Initialize the unconditional event generator."""
-        # Start the unconditional event generator in a separate thread
         thread = threading.Thread(target=UnconditionalEventGenerator, daemon=True)
         thread.start()
         logger.info("Unconditional event generator started")
@@ -831,12 +820,10 @@ def ActualInitializer() -> None:
 
 def CheckPluginAccess(handler: Callable, rawEvent: Dict) -> bool:
     """Check if a plugin handler has access to the event."""
-    # Get plugin name from handler module
     pluginName = getattr(handler, '__module__', 'unknown')
     if not pluginName.endswith('.py'):
         pluginName += '.py'
     
-
     groupID = rawEvent.get('group_id')
     
     # Get rules
@@ -870,8 +857,6 @@ def CheckPluginAccess(handler: Callable, rawEvent: Dict) -> bool:
         else:
             return None  # No match
     
-
-    
     # Check plugin-specific rules
     if pluginName in all_rules:
         localRules = all_rules[pluginName].get(context, {})
@@ -896,16 +881,7 @@ def CheckPluginAccess(handler: Callable, rawEvent: Dict) -> bool:
     return default_policy == 'allow'
 
 def CheckPluginPrivilege(pluginName: str) -> bool:
-    """
-    Check if a plugin has cross-origin config access privilege.
-    
-    Args:
-        pluginName: Name of the plugin (with or without .py extension)
-        
-    Returns:
-        bool: True if plugin has privilege, False otherwise
-    """
-    # Ensure plugin name has .py extension
+    """Check if a plugin has cross-origin config access privilege."""
     if not pluginName.endswith('.py'):
         pluginName += '.py'
     
@@ -922,25 +898,17 @@ def CheckPluginPrivilege(pluginName: str) -> bool:
     return global_rules.get('privilege', False)
 
 def AdminNotifier(messageLevel: str, message: str) -> None:
-    """
-    发送管理员通知的显式调用接口
-    
-    Args:
-        level: 通知级别 (DEBUG/INFO/WARNING/ERROR/CRITICAL)
-        message: 通知消息
-    """
-    # 检查是否启用通知
+    """Send notification to administrator via QQ message."""
     if not CONFIG['ADMIN_NOTIFICATION']['enabled']:
         return
     
     if not CONFIG['ADMIN_NOTIFICATION']['admin_qq']:
         return
     
-    # 检查级别是否符合配置的通知级别
+    # Check if message level meets threshold
     thresholdLevel = CONFIG['ADMIN_NOTIFICATION']['notify_level']
     thresholdLevel = LOGGING_LEVELS[CONFIG['ADMIN_NOTIFICATION']['notify_level']]
     messageLevel = LOGGING_LEVELS[messageLevel]
-    # no safe get, because thresholdLevel is guaranteed by FrameworkConfigReader, and messageLevel is always internally called - if it is not a valid level, it is a bug that need attention and be fixed
     if messageLevel < thresholdLevel:
         return
     
@@ -963,15 +931,14 @@ def AdminNotifier(messageLevel: str, message: str) -> None:
             }
     
     def AdminNotificationSender():
-        """Internal function to send the actual notification."""
+        """Send the actual notification."""
         global AdminNotificationLast
         
-        # Pre-calculate values
         messageHash = MessageHasher(message)
         currentTime = time.time()
         rateLimit = CONFIG['ADMIN_NOTIFICATION']['rate_limit_seconds']
         
-        # Phase 1: Check if we should send
+        # Check rate limiting
         with AdminNotificationLock:
             lastTime = AdminNotificationLast.get(messageHash, 0)
             if currentTime - lastTime < rateLimit:
@@ -1006,12 +973,7 @@ def AdminNotifier(messageLevel: str, message: str) -> None:
     thread.start()
 
 def AdminDispatcher(rawEvent: Dict) -> bool:
-    """
-    Handle admin control commands.
-    
-    Returns:
-        bool: True if the event was handled (should skip further processing)
-    """
+    """Handle admin control commands (mute/unmute)."""
     global IS_MUTED
     
     adminQQ = CONFIG['ADMIN_NOTIFICATION']['admin_qq']
@@ -1034,22 +996,17 @@ def AdminDispatcher(rawEvent: Dict) -> bool:
     
     return False
 
-
-
 def UnconditionalEventGenerator() -> None:
-    """Generate UNCONDITIONAL events and send them to the main dispatcher."""
+    """Generate UNCONDITIONAL events at scheduled intervals."""
     logger.info("Starting UNCONDITIONAL event generator")
     AdminNotifier('INFO', "Starting UNCONDITIONAL event generator")
     
     while True:
-          
         now = datetime.datetime.now()
         secondsToNextMinute = 60 - now.second + 3  # +3s buffer to avoid rounding errors
         time.sleep(secondsToNextMinute)
         
-     
-        unconditional_event = \
-        {
+        unconditional_event = {
             "post_type": "unconditional",
             "time": int(time.time())
         }
@@ -1064,18 +1021,8 @@ def UnconditionalEventGenerator() -> None:
             logger.error(f"Failed to send unconditional event: {e}")
             AdminNotifier('ERROR', f"Failed to send unconditional event: {e}")
 
-
-
-
-
 def EventTypeParser(rawEvent: Dict) -> str:
-    """
-    Parse raw event to determine its type.
-    
-    Returns:
-        str: Event type code or "UNEXPECTED" for unrecognized events
-    """
-
+    """Parse raw event to determine its type."""
     match rawEvent.get("post_type"):
         case "message":
             match rawEvent.get("message_type"):
@@ -1167,13 +1114,7 @@ def EventTypeParser(rawEvent: Dict) -> str:
     return "UNEXPECTED"
 
 def InbondMessageParser(rawEvent: Dict) -> Union[Dict, None]:
-    """
-    Parse incoming message event to extract simple event data.
-    
-    Returns:
-        Dict: Simple event data for message events
-        None: For non-message events
-    """
+    """Parse incoming message event to extract simple event data."""
     eventType = EventTypeParser(rawEvent)
     
     match eventType:
@@ -1216,15 +1157,7 @@ def InbondMessageParser(rawEvent: Dict) -> Union[Dict, None]:
             return None
 
 def SubprocessConfigReader(pluginName: str) -> Dict:
-    """
-    Read plugin configuration from database (subprocess version).
-    
-    Args:
-        pluginName: Name of the plugin
-        
-    Returns:
-        Dict: Plugin configuration or empty dict if not found
-    """
+    """Read plugin configuration from database (subprocess version)."""
     dbPath = CONFIG['PATHS']['database_file']
     
     try:
@@ -1257,13 +1190,7 @@ def SubprocessConfigReader(pluginName: str) -> Dict:
         return {}
 
 def SubprocessConfigWriter(pluginName: str, config: Dict) -> None:
-    """
-    Write plugin configuration to database (subprocess version).
-    
-    Args:
-        pluginName: Name of the plugin
-        config: Configuration dictionary to save
-    """
+    """Write plugin configuration to database (subprocess version)."""
     dbPath = CONFIG['PATHS']['database_file']
     
     if not isinstance(config, dict):
@@ -1315,17 +1242,7 @@ def SubprocessConfigWriter(pluginName: str, config: Dict) -> None:
         AdminNotifier('ERROR', f"ConfigWriter: Failed to serialize config for plugin {pluginName}: {e}")
 
 def SubprocessApiCaller(action: str, data: Dict) -> Union[Dict, None]:
-    """
-    Call NapCat API from subprocess.
-    
-    Args:
-        action: API action name
-        data: API parameters
-        
-    Returns:
-        Dict: API response data on success
-        None: On failure
-    """
+    """Call NapCat API from subprocess."""
     if not isinstance(action, str) or not action:
         logger.error("ApiCaller: action must be non-empty string")
         AdminNotifier('ERROR', "ApiCaller: action must be non-empty string")
@@ -1366,54 +1283,29 @@ def SubprocessApiCaller(action: str, data: Dict) -> Union[Dict, None]:
         return None
 
 def SubprocessCrossOriginConfigReader(caller_plugin: str, target_plugin: str) -> Union[Dict, None]:
-    """
-    Read another plugin's configuration with privilege check.
-    
-    Args:
-        caller_plugin: Name of the calling plugin
-        target_plugin: Name of the target plugin to read config from
-        
-    Returns:
-        Dict: Target plugin's configuration if allowed
-        None: If access denied or error occurs
-    """
+    """Read another plugin's configuration with privilege check."""
     # Check if caller has privilege
     if not CheckPluginPrivilege(caller_plugin):
         logger.warning(f"Plugin {caller_plugin} attempted cross-origin config read without privilege")
         AdminNotifier('WARNING', f"Plugin {caller_plugin} attempted cross-origin config read without privilege")
         return None
     
-    # Log the cross-origin access
     logger.info(f"Plugin {caller_plugin} is reading config of plugin {target_plugin}")
     AdminNotifier('INFO', f"Plugin {caller_plugin} is reading config of plugin {target_plugin}")
     
-    # Read target plugin's config
     return SubprocessConfigReader(target_plugin)
 
 def SubprocessCrossOriginConfigWriter(caller_plugin: str, target_plugin: str, config: Dict) -> Union[bool, None]:
-    """
-    Write another plugin's configuration with privilege check.
-    
-    Args:
-        caller_plugin: Name of the calling plugin
-        target_plugin: Name of the target plugin to write config to
-        config: Configuration to write
-        
-    Returns:
-        bool: True if write successful
-        None: If access denied or error occurs
-    """
+    """Write another plugin's configuration with privilege check."""
     # Check if caller has privilege
     if not CheckPluginPrivilege(caller_plugin):
         logger.warning(f"Plugin {caller_plugin} attempted cross-origin config write without privilege")
         AdminNotifier('WARNING', f"Plugin {caller_plugin} attempted cross-origin config write without privilege")
         return None
     
-    # Log the cross-origin access
     logger.info(f"Plugin {caller_plugin} is writing config of plugin {target_plugin}")
     AdminNotifier('INFO', f"Plugin {caller_plugin} is writing config of plugin {target_plugin}")
     
-    # Write target plugin's config
     SubprocessConfigWriter(target_plugin, config)
     return True
 
@@ -1424,20 +1316,7 @@ def SubprocessLibrarian(
     intervalMaxCount: int = 2047,
     stringOutput: bool = False
 ) -> Union[List[Dict], str]:
-    """
-    Query event history from database (subprocess version).
-    
-    Args:
-        eventIdentifier: Query conditions
-        eventCount: Number of recent events to return (0 = all)
-        interval: Time window in seconds (optional)
-        intervalMaxCount: Maximum events to query when using interval
-        stringOutput: Return formatted string instead of list
-        
-    Returns:
-        List[Dict]: List of events in chronological order
-        str: Formatted history string if stringOutput=True
-    """
+    """Query event history from database (subprocess version)."""
     dbPath = CONFIG['PATHS']['database_file']
     databaseConnect = None
     
@@ -1482,7 +1361,7 @@ def SubprocessLibrarian(
             current_time = int(time.time())
             cutoff_time = current_time - interval
             
-            # Binary search approach
+            # Binary search approach to avoid loading too much data at once
             fetch_count = 1
             events = []
             oldest_timestamp = current_time
@@ -1548,7 +1427,6 @@ def SubprocessLibrarian(
         
         events.reverse()  # Return chronological order
         
-        # Handle string output
         if stringOutput:
             return HistoryParser(events)
         else:
@@ -1566,17 +1444,8 @@ def SubprocessLibrarian(
                 pass
 
 def HistoryParser(events: List[Dict]) -> str:
-    """
-    Parse event history into a formatted string.
-    
-    Args:
-        events: List of event dictionaries
-        
-    Returns:
-        str: Formatted multi-line string representation
-    """
+    """Parse event history into a formatted string."""
     # TODO: Implement proper history parsing based on event types
-    # For now, return a simple placeholder
     lines = []
     for event in events:
         event_type = event.get('post_type', 'unknown')
@@ -1593,16 +1462,7 @@ def HistoryParser(events: List[Dict]) -> str:
     return '\n'.join(lines)
 
 def PluginWorker(handler, simpleEvent: Union[Dict, None], rawEvent: Dict, resultPipe, memoryLimit: int):
-    """
-    Worker function that runs in subprocess to execute plugin code.
-    
-    Args:
-        handler: Plugin handler function
-        simpleEvent: Simple event data or None
-        rawEvent: Complete event data
-        resultPipe: Pipe to send result back to parent
-        memoryLimit: Memory limit in bytes
-    """
+    """Worker function that runs in subprocess to execute plugin code."""
     try:
         # Set memory limit (Linux only)
         try:
@@ -1659,13 +1519,7 @@ def PluginWorker(handler, simpleEvent: Union[Dict, None], rawEvent: Dict, result
         resultPipe.close()
 
 def PluginMonitor(process, startTime, maxCpuTime: float, maxWallTime: float, memoryLimit: int):
-    """
-    Monitor plugin process resource usage.
-    
-    Returns:
-        str: Termination reason if limits exceeded
-        None: If process is within limits
-    """
+    """Monitor plugin process resource usage."""
     try:
         pluginProcess = psutil.Process(process.pid)
         
@@ -1698,12 +1552,7 @@ def PluginMonitor(process, startTime, maxCpuTime: float, maxWallTime: float, mem
         return None
 
 def PluginCallerSingle(handler, simpleEvent: Union[Dict, None], rawEvent: Dict):
-    """
-    Execute a single plugin in an isolated subprocess.
-    
-    Returns:
-        Plugin result or None on failure
-    """
+    """Execute a single plugin in an isolated subprocess."""
     parentConn = None
     process = None
     try:
@@ -1797,22 +1646,10 @@ def PluginCaller(
     rawEvent: Dict,
     resultCallback: Optional[Callable] = None
 ) -> List[Any]:
-    """
-    Execute multiple plugins in parallel with immediate result processing.
-    
-    Args:
-        handlers: List of plugin handler functions
-        simpleEvent: Simple event data or None
-        rawEvent: Complete event data
-        resultCallback: Function to call immediately when a plugin completes
-        
-    Returns:
-        List of plugin results in original order
-    """
+    """Execute multiple plugins in parallel with immediate result processing."""
     if not handlers:
         return []
     
-
     results = {}
     resultQueue = queue.Queue()
     
@@ -1880,13 +1717,7 @@ def PluginCaller(
     return orderedResults
 
 def NapCatSender(actionEndpoint: str, requestBody: Dict) -> None:
-    """
-    Send action request to NapCat API.
-    
-    Args:
-        actionEndpoint: API endpoint name
-        requestBody: Request data
-    """
+    """Send action request to NapCat API."""
     baseUrl = CONFIG['NAPCAT_SERVER']['api_url']
     fullUrl = f"{baseUrl}/{actionEndpoint}"
     
@@ -1946,17 +1777,10 @@ def NapCatSender(actionEndpoint: str, requestBody: Dict) -> None:
         AdminNotifier('ERROR', f"Failed to send {actionEndpoint}. Could not get bot status: {e}")
 
 def OutbondMessageParser(pluginResponse: Any, rawEvent: Dict) -> None:
-    """
-    Parse plugin response and execute appropriate actions.
-    
-    Args:
-        pluginResponse: Plugin return value
-        rawEvent: Original event data for context
-    """
+    """Parse plugin response and execute appropriate actions."""
     if isinstance(pluginResponse, str):
         postType = rawEvent.get("post_type")
         
-                
         groupId = rawEvent.get("group_id")
         userId = rawEvent.get("user_id")
             
@@ -2113,7 +1937,7 @@ def MainDispatcher(rawEvent: Dict) -> None:
         for triggerType in eventTypesToTrigger_:
             handlerList_ = PLUGIN_REGISTRY.get(triggerType, [])
             for handler in handlerList_:
-                    matchedHandlers_.add(handler)
+                matchedHandlers_.add(handler)
         
         # Apply access control filtering
         for handler in matchedHandlers_:
@@ -2130,8 +1954,6 @@ def MainDispatcher(rawEvent: Dict) -> None:
             OutbondMessageParser(result, event)
         
         PluginCaller(HandlersToExecute_, simpleEvent, rawEvent, ResponseProcessor)
-
-
 
 if __name__ == '__main__':
     Initializer()
