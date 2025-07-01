@@ -108,7 +108,7 @@ curl http://localhost:19219/health
 {
   "version": "1.0",
   "NAPCAT_SERVER": {
-    "api_url": "http://localhost:3000"
+    "api_url": "http://localhost:19218"
   },
   "NAPCAT_LISTEN": {
     "host": "0.0.0.0",
@@ -137,11 +137,6 @@ curl http://localhost:19219/health
     "notify_level": "ERROR",
     "rate_limit_seconds": 1200,
     "message_format": "Askr Alert \n[{level}] {time}\n{message}"
-  },
-  "GRACEFUL_SHUTDOWN": {
-    "enabled": true,
-    "max_wait_seconds": 30,
-    "notify_admin_on_shutdown": true
   }
 }
 ```
@@ -178,11 +173,6 @@ curl http://localhost:19219/health
 - `notify_level`：通知级别（DEBUG/INFO/WARNING/ERROR/CRITICAL）
 - `rate_limit_seconds`：相同消息的通知间隔（秒）
 - `message_format`：通知消息格式模板
-
-**GRACEFUL_SHUTDOWN**
-- `enabled`：是否启用优雅关闭
-- `max_wait_seconds`：最大等待时间
-- `notify_admin_on_shutdown`：关闭时是否通知管理员
 
 #### 配置注意事项
 
@@ -250,6 +240,8 @@ curl http://localhost:19219/health
   - `BlackList`：黑名单群号列表（数组）
 - `privilege`：是否有跨域配置访问权限（布尔值）
 
+对于同一插件、同一场景，白名单和黑名单只能二选一（如某插件的群聊规则，只能有白名单或黑名单；如果两者都提供，初始化阶段会弹出警告，且只有白名单会生效）。
+如果同时配置了全局规则和针对特定插件的规则，以针对特定插件的规则优先。
 #### 访问控制逻辑
 
 1. **优先级规则**：
@@ -363,33 +355,5 @@ curl http://localhost:19219/health
    - 使用访问控制减少不必要的插件调用
    - 合理设置UNCONDITIONAL插件的执行间隔
    - 监控插件执行时间和资源使用
-
----
-
-## 故障排查
-
-### 常见问题
-
-1. **框架无法启动**：
-   - 检查Python版本是否满足要求（3.12+）
-   - 检查依赖是否安装完整
-   - 查看是否有端口冲突
-
-2. **插件不工作**：
-   - 检查插件文件是否在plugins目录
-   - 查看日志中的插件加载信息
-   - 验证MANIFEST声明是否正确
-
-3. **无法收到消息**：
-   - 确认NapCat上报地址配置正确
-   - 检查访问控制配置
-   - 查看是否处于mute状态
-
-### 调试技巧
-
-1. 查看框架日志了解插件加载和执行情况
-2. 使用健康检查端点确认服务状态
-3. 临时调高日志级别获取更多信息
-4. 使用简单插件测试基本功能
 
 ---

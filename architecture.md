@@ -169,7 +169,7 @@ MainDispatcher(rawEvent)
 - **功能**: 检查插件是否有权限处理该事件
 - **参数**: handler - 插件函数，rawEvent - 事件数据
 - **返回**: True 允许执行，False 拒绝
-- **规则**: 白名单 > 黑名单，插件规则 > global 规则
+- **规则**: 插件规则 > global 规则
 
 **`CheckPluginPrivilege(pluginName: str) -> bool`**
 - **功能**: 检查插件是否有跨域配置访问权限

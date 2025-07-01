@@ -439,13 +439,16 @@ def ActualInitializer() -> None:
                     # Validate private rules
                     if 'private' in localRules and isinstance(localRules['private'], dict):
                         privateRules = {}
+                        if 'WhiteList' in localRules['private'] and 'BlackList' in localRules['private']:
+                            logger.warning(f"Plugin '{pluginName}' has both WhiteList and BlackList in private rules, using only WhiteList")
+                            AdminNotifier('WARNING', f"Plugin '{pluginName}' has both WhiteList and BlackList in private rules, using only WhiteList")
                         if 'WhiteList' in localRules['private']:
                             if isinstance(localRules['private']['WhiteList'], list):
                                 privateRules['WhiteList'] = set(
                                     id for id in localRules['private']['WhiteList']
                                     if isinstance(id, int) and id > 0
                                 )
-                        if 'BlackList' in localRules['private']:
+                        elif 'BlackList' in localRules['private']:
                             if isinstance(localRules['private']['BlackList'], list):
                                 privateRules['BlackList'] = set(
                                     id for id in localRules['private']['BlackList']
@@ -458,13 +461,16 @@ def ActualInitializer() -> None:
                     # Validate group rules
                     if 'group' in localRules and isinstance(localRules['group'], dict):
                         groupRules = {}
+                        if 'WhiteList' in localRules['group'] and 'BlackList' in localRules['group']:
+                            logger.warning(f"Plugin '{pluginName}' has both WhiteList and BlackList in group rules, using only WhiteList")
+                            AdminNotifier('WARNING', f"Plugin '{pluginName}' has both WhiteList and BlackList in group rules, using only WhiteList")
                         if 'WhiteList' in localRules['group']:
                             if isinstance(localRules['group']['WhiteList'], list):
                                 groupRules['WhiteList'] = set(
                                     id for id in localRules['group']['WhiteList']
                                     if isinstance(id, int) and id > 0
                                 )
-                        if 'BlackList' in localRules['group']:
+                        elif 'BlackList' in localRules['group']:
                             if isinstance(localRules['group']['BlackList'], list):
                                 groupRules['BlackList'] = set(
                                     id for id in localRules['group']['BlackList']
@@ -845,7 +851,7 @@ def CheckPluginAccess(handler: Callable, rawEvent: Dict) -> bool:
         context = 'private'
         contextID = rawEvent.get('user_id', 0)
     
-    def OnListChecker(rules: Dict, contextID: int) -> Optional[bool]:
+    def ListChecker(rules: Dict, contextID: int) -> Optional[bool]:
         """Check whitelist/blacklist. Returns True=allow, False=deny, None=no match."""            
         whitelist_ = rules.get('WhiteList', set())
         blacklist_ = rules.get('BlackList', set())
@@ -860,27 +866,30 @@ def CheckPluginAccess(handler: Callable, rawEvent: Dict) -> bool:
             if contextID in blacklist_:
                 return False
             else:
-                return None
+                return True # Not in blacklist
         else:
             return None  # No match
     
-    # Check global rules first
-    if 'global' in all_rules:
-        global_rules = all_rules['global'].get(context, {})
-        result = OnListChecker(global_rules, contextID)
-        if result is False:  # Explicitly denied by global rules
-            logger.debug(f"Plugin {pluginName} is not activated by global rules for {context} {contextID}")
-            AdminNotifier('DEBUG', f"Plugin {pluginName} is not activated by global rules for {context} {contextID}")
-            return False
+
     
     # Check plugin-specific rules
     if pluginName in all_rules:
         localRules = all_rules[pluginName].get(context, {})
-        result = OnListChecker(localRules, contextID)
+        result = ListChecker(localRules, contextID)
         if result is not None:
             if not result:
                 logger.debug(f"Plugin {pluginName} is not activated by specific rules for {context} {contextID}")
                 AdminNotifier('DEBUG', f"Plugin {pluginName} is not activated by specific rules for {context} {contextID}")
+            return result
+    
+    # Then Check global rules
+    if 'global' in all_rules:
+        global_rules = all_rules['global'].get(context, {})
+        result = ListChecker(global_rules, contextID)
+        if result is not None:
+            if not result:  # Explicitly denied by global rules
+                logger.debug(f"Plugin {pluginName} is not activated by global rules for {context} {contextID}")
+                AdminNotifier('DEBUG', f"Plugin {pluginName} is not activated by global rules for {context} {contextID}")
             return result
     
     # Apply default policy
