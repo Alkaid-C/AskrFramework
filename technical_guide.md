@@ -6,7 +6,7 @@
 
 ### 统一的事件-响应范式
 
-Askr Framework建立在一个简单而强大的概念之上：**一切皆事件，一切皆响应**。无论是来自QQ用户的消息、系统定时任务，还是插件初始化，都被抽象为"事件"。插件的唯一职责就是对事件做出响应。
+Askr Framework建立在一个简单的概念上：**一切皆事件，一切皆响应**。无论是来自QQ用户的消息、系统定时任务，还是插件初始化，都被抽象为"事件"。插件的唯一职责就是对事件做出响应。
 
 这种设计带来了几个重要优势：
 
@@ -30,7 +30,12 @@ Askr Framework建立在一个简单而强大的概念之上：**一切皆事件�
 
 框架的接口设计支持从简单到复杂的渐进式学习：
 
-**最小可用性**：一个3行代码的插件就能实现有意义的功能。
+**最小可用性**：一个3行代码的插件就能实现有意义的功能：
+```python
+MANIFEST = {"MESSAGE_PRIVATE": "复读机"}
+def 复读机(simpleEvent):
+    return simpleEvent["text_message"]
+```
 
 **按需复杂度**：开发者可以根据需要逐步引入更多概念（rawEvent、botContext、配置管理等），而不是一开始就面对全部复杂性。
 
@@ -44,6 +49,20 @@ Askr Framework采用独特的"框架多线程 + 插件多进程"混合架构：
 
 **框架层并发**：主框架使用多线程处理不同插件的启动和结果收集，实现真正的并行执行。
 
+```python
+def PluginCaller(handlers, simpleEvent, rawEvent, resultCallback):
+    # 为每个插件创建独立线程
+    for i, handler in enumerate(handlers):
+        thread = threading.Thread(target=executePluginThread, args=(handler, i))
+        thread.start()
+    
+    # 立即处理完成的插件结果
+    while completedCount < len(handlers):
+        handlerIndex, handler, result = resultQueue.get()
+        if resultCallback and result is not None:
+            resultCallback(result, rawEvent)
+```
+
 **插件层隔离**：每个插件在独立的子进程中运行，拥有完全隔离的内存空间和执行环境。
 
 **通信机制**：通过multiprocessing.Pipe()进行进程间通信，传递事件数据和执行结果。
@@ -54,181 +73,400 @@ Askr Framework采用独特的"框架多线程 + 插件多进程"混合架构：
 
 ### 智能事件过滤系统
 
-框架扩展了OneBot 11标准，实现了前级事件过滤：
+框架扩展了OneBot 11标准，实现了多层次的事件过滤：
 
 **群消息三级分类**：
+```python
+def EventTypeParser(rawEvent):
+    if rawEvent.get("message_type") == "group":
+        selfId = str(rawEvent.get("self_id", ""))
+        messageSegments = rawEvent.get("message", [])
+        
+        # @mention有最高优先级
+        for segment in messageSegments:
+            if segment.get("type") == "at":
+                atQQ = segment.get("data", {}).get("qq", "")
+                if atQQ == selfId:
+                    return "MESSAGE_GROUP_MENTION"
+        
+        # 检查指令前缀
+        for segment in messageSegments:
+            if segment.get("type") == "text":
+                text = segment.get("data", {}).get("text", "")
+                trimmedText = text.lstrip()
+                if trimmedText and trimmedText[0] in ['.', '/', '\\']:
+                    return "MESSAGE_GROUP_BOT"
+                break
+        
+        return "MESSAGE_GROUP"
+```
+
 - `MESSAGE_GROUP`：普通群消息
 - `MESSAGE_GROUP_MENTION`：包含@机器人的消息  
 - `MESSAGE_GROUP_BOT`：以指令前缀（`.` `/` `\`）开头的消息
 
-**扩展事件机制**：`MESSAGE_GROUP_MENTION`类型的消息也会触发`MESSAGE_GROUP`类型的处理函数，让插件可以选择处理粗粒度或细粒度的事件。
+**扩展事件机制**：
+```python
+EVENT_INHERITANCE = {
+    "MESSAGE_GROUP_MENTION": ["MESSAGE_GROUP"],
+    "MESSAGE_GROUP_BOT": ["MESSAGE_GROUP"],
+}
+```
+
+`MESSAGE_GROUP_MENTION`和`MESSAGE_GROUP_BOT`类型的消息也会触发`MESSAGE_GROUP`类型的处理函数，让插件可以选择处理粗粒度或细粒度的事件。
+
+**访问控制过滤**：
+```python
+def CheckPluginAccess(handler, rawEvent):
+    pluginName = getattr(handler, '__module__', 'unknown')
+    # 检查访问控制规则
+    # 白名单 > 黑名单 > 默认策略
+```
+
+通过`PluginsAccessControl.json`配置文件，基于private/group上下文进行精确的ID过滤，避免创建不必要的进程。
 
 **性能优化效果**：在典型的群聊机器人场景中，大部分普通群消息不会触发插件执行，显著减少了不必要的进程创建开销。
 
 ### botContext工具协议
 
-Askr Framework为插件提供了类似MCP(Model Context Protocol)的标准化工具接口：
+Askr Framework为插件提供了标准化的工具接口：
 
-**历史记录查询**：`Librarian(eventIdentifier, eventCount)` - 查询私聊、群聊或特定类型事件的历史记录
+**历史记录查询**：
+```python
+def SubprocessLibrarian(eventIdentifier, eventCount=50, interval=None, intervalMaxCount=2047, stringOutput=False):
+    # 支持时间窗口查询的二分查询策略
+    if interval is not None:
+        fetch_count = 1
+        while fetch_count <= intervalMaxCount:
+            cursor.execute(query, query_params + [fetch_count])
+            rows = cursor.fetchall()
+            oldest_timestamp = rows[-1][1] if rows else current_time
+            if oldest_timestamp >= cutoff_time:
+                fetch_count = min(fetch_count * 2, intervalMaxCount)
+            else:
+                break
+```
 
-**配置持久化**：`ConfigReader()` / `ConfigWriter(config)` - 读写插件专用的配置数据，自动命名空间隔离
+**配置管理**：
+- `ConfigReader()` / `ConfigWriter(config)` - 自身配置管理
+- `CrossOriginConfigReader(target)` / `CrossOriginConfigWriter(target, config)` - 跨域配置访问（需privilege权限）
 
-**API调用**：`ApiCaller(action, data)` - 向NapCat发送查询类API请求
+**API调用**：
+```python
+def SubprocessApiCaller(action, data):
+    baseUrl = CONFIG['NAPCAT_SERVER']['api_url']
+    fullUrl = f"{baseUrl}/{action}"
+    response = requests.post(fullUrl, json=data, timeout=5.0)
+    return response.json() if response.status_code == 200 else None
+```
 
 **设计特点**：
 - **主子进程版本自适应**：框架自动选择合适的实现版本
 - **错误容忍设计**：工具调用失败返回None或空值，不会中断插件执行
 - **统一的错误处理策略**：所有工具都采用相同的错误处理模式
+- **权限控制**：跨域访问需要显式授权，访问行为被记录
 
 ### 数据流分工设计
 
 框架中的数据按照清晰的分工流动：
 
 **输入数据分层**：
+```python
+def InbondMessageParser(rawEvent):
+    # 为消息事件生成简化的simpleEvent
+    eventType = EventTypeParser(rawEvent)
+    if eventType.startswith("MESSAGE_"):
+        messageSegments = rawEvent.get("message", [])
+        textParts = []
+        for segment in messageSegments:
+            if segment.get("type") == "text":
+                textParts.append(segment.get("data", {}).get("text", ""))
+        return {
+            "user_id": rawEvent.get("user_id"),
+            "group_id": rawEvent.get("group_id"),  # 仅群消息
+            "text_message": "".join(textParts)
+        }
+```
+
 - `rawEvent`：完整的OneBot 11事件数据，供需要详细信息的插件使用
 - `simpleEvent`：简化的事件数据，包含最常用的字段，降低使用门槛
 
 **输出响应分类**：
-- **字符串返回值**：自动转换为文本消息发送
-- **字典返回值**：直接作为OneBot 11 API调用
-- **列表返回值**：批量处理多个操作
+```python
+def OutbondMessageParser(pluginResponse, rawEvent):
+    if isinstance(pluginResponse, str):
+        # 自动转换为文本消息发送
+    elif isinstance(pluginResponse, dict):
+        # 直接作为OneBot 11 API调用
+        NapCatSender(pluginResponse["action"], pluginResponse["data"])
+    elif isinstance(pluginResponse, list):
+        # 批量处理多个操作
+        for item in pluginResponse:
+            OutbondMessageParser(item, rawEvent)
+```
 
 **API调用分工**：
 - **查询类API**（get_*）：通过`botContext["ApiCaller"]`调用，返回值用于决策
 - **行动类API**（send_*、set_*）：通过插件返回值调用，返回值通常不重要
 
+## 生产环境特性
+
+### 外部配置系统
+
+框架支持通过`frameworkConfig.json`进行配置，实现了配置与代码的分离：
+
+**配置加载机制**：
+```python
+def FrameworkConfigReader():
+    # 深度合并配置，只需提供要修改的配置项
+    if 'NAPCAT_SERVER' in fileConfig:
+        if 'api_url' in fileConfig['NAPCAT_SERVER']:
+            CONFIG['NAPCAT_SERVER']['api_url'] = fileConfig['NAPCAT_SERVER']['api_url']
+```
+
+- 在框架初始化时读取配置文件
+- 深度合并机制：只需提供要修改的配置项
+- 类型验证：自动检查配置值的类型和范围
+- 容错设计：配置错误不会阻止框架启动
+
+### 插件访问控制
+
+通过`PluginsAccessControl.json`实现细粒度的访问控制：
+
+**控制机制**：
+```python
+def CheckPluginAccess(handler, rawEvent):
+    # 获取插件名和事件信息
+    pluginName = getattr(handler, '__module__', 'unknown')
+    groupID = rawEvent.get('group_id')
+    contextID = groupID if groupID else rawEvent.get('user_id', 0)
+    
+    # 检查白名单/黑名单
+    def OnListChecker(rules, contextID):
+        whitelist_ = rules.get('WhiteList', set())
+        blacklist_ = rules.get('BlackList', set())
+        
+        if whitelist_:
+            return contextID in whitelist_
+        elif blacklist_:
+            return contextID not in blacklist_
+        return None
+    
+    # 插件规则 > global规则 > 默认策略
+```
+
+- 基于private/group上下文的分离控制
+- 支持WhiteList/BlackList模式
+- 全局规则（使用"global"作为键）
+- 默认策略配置（allow/deny）
+- 集成的privilege权限管理
+
+### 跨域配置访问
+
+框架支持有权限的插件访问其他插件的配置：
+
+**权限模型**：
+```python
+def CheckPluginPrivilege(pluginName):
+    all_rules = PLUGIN_ACCESS_RULES.get('rules', {})
+    if pluginName in all_rules:
+        localRules = all_rules[pluginName]
+        if 'privilege' in localRules:
+            return localRules['privilege']
+    # 回退到global默认值
+    global_rules = all_rules.get('global', {})
+    return global_rules.get('privilege', False)
+```
+
+- 在`PluginsAccessControl.json`中设置`"privilege": true`
+- 未设置privilege的插件使用global默认值
+- 所有跨域访问被记录到日志
+
+### 增强的历史查询
+
+Librarian工具支持时间窗口查询，使用二分搜索策略优化性能：
+
+**二分查询策略**：
+```python
+def SubprocessLibrarian(eventIdentifier, interval=None, intervalMaxCount=2047):
+    if interval is not None:
+        fetch_count = 1
+        while fetch_count <= intervalMaxCount:
+            # 查询fetch_count条记录
+            cursor.execute(query, query_params + [fetch_count])
+            rows = cursor.fetchall()
+            
+            oldest_timestamp = rows[-1][1] if rows else current_time
+            if oldest_timestamp >= cutoff_time:
+                # 需要更多数据，翻倍查询数量
+                fetch_count = min(fetch_count * 2, intervalMaxCount)
+            else:
+                # 已经查询到足够的历史数据
+                break
+```
+
+这种策略避免了一次性加载过多数据，同时确保能够获取指定时间窗口内的完整数据。
+
+### UNCONDITIONAL事件统一化
+
+UNCONDITIONAL事件现在作为普通事件类型处理，保持了框架的一致性：
+
+**实现机制**：
+```python
+def UnconditionalEventGenerator():
+    while True:
+        now = datetime.datetime.now()
+        secondsToNextMinute = 60 - now.second + 3  # +3s缓冲
+        time.sleep(secondsToNextMinute)
+        
+        unconditional_event = {
+            "post_type": "unconditional",
+            "time": int(time.time())
+        }
+        
+        # 通过HTTP自调用发送到主事件处理器
+        url = f"http://localhost:{CONFIG['NAPCAT_LISTEN']['port']}/"
+        requests.post(url, json=unconditional_event, timeout=5.0)
+```
+
+**调度机制**：
+```python
+def MainDispatcher(rawEvent):
+    if eventType == "UNCONDITIONAL":
+        currentMinute = datetime.datetime.fromtimestamp(rawEvent["time"]).minute
+        for handler, interval in PLUGIN_REGISTRY.get("UNCONDITIONAL", []):
+            if currentMinute % interval == 0:
+                HandlersToExecute_.append(handler)
+```
+
+间隔N表示在分钟数能被N整除时执行，如间隔15在第0、15、30、45分钟执行。
+
+### 优雅关闭机制
+
+框架支持优雅关闭，确保插件能够正常完成执行：
+
+**关闭流程**：
+1. 接收SIGTERM/SIGINT信号
+2. 设置SHUTDOWN_REQUESTED标志
+3. 拒绝新的HTTP请求（返回503）
+4. 等待所有活跃插件完成
+5. 超时后强制退出
+
+**活跃插件跟踪**：框架维护活跃插件计数器，用于判断是否可以安全关闭。
+
+### 健康检查端点
+
+新增`/health`端点提供系统状态信息：
+
+```python
+@NAPCAT_LISTENER.route('/health', methods=['GET'])
+def HealthCheck():
+    # 检查NapCat服务器状态
+    NapCatServerStatus = 'Unreachable'
+    try:
+        baseUrl = CONFIG['NAPCAT_SERVER']['api_url']
+        statusUrl = f"{baseUrl}/get_status"
+        statusResponse = requests.get(statusUrl, timeout=CONFIG['HTTP']['status_check_timeout'])
+        if statusResponse.status_code == 200:
+            statusData = statusResponse.json()
+            if statusData.get('status', '') == 'ok':
+                NapCatServerStatus = 'OK'
+    except:
+        pass
+    
+    return {
+        'status': 'healthy',
+        'timestamp': int(time.time()),
+        'is_muted': IS_MUTED,
+        'version': 'Beta 0.98',
+        'NapCatServerStatus': NapCatServerStatus
+    }
+```
+
+### 管理员通知系统
+
+框架提供智能的管理员通知功能：
+
+**防刷屏机制**：
+```python
+def AdminNotifier(messageLevel, message):
+    def MessageHasher(message):
+        return hashlib.md5(message.encode('utf-8')).hexdigest()[:8]
+    
+    messageHash = MessageHasher(message)
+    currentTime = time.time()
+    rateLimit = CONFIG['ADMIN_NOTIFICATION']['rate_limit_seconds']
+    
+    with AdminNotificationLock:
+        lastTime = AdminNotificationLast.get(messageHash, 0)
+        if currentTime - lastTime < rateLimit:
+            return  # 跳过重复通知
+        AdminNotificationLast[messageHash] = currentTime
+```
+
+- 相同消息在配置时间内只通知一次（默认1200秒）
+- 基于消息内容的hash值判断重复
+- 支持可配置的通知级别过滤
+- 异步发送，不阻塞主流程
+
 ## 插件执行模型详解
 
-### 三阶段生命周期
+### 初始化阶段
+```python
+def RegistryInitializer():
+    for handlerFunction, pluginName in INITIALIZER_REGISTRY:
+        try:
+            emptyRawEvent = {"post_type": "initializer", "time": int(time.time())}
+            result = PluginCallerSingle(handlerFunction, None, emptyRawEvent)
+            
+            if isinstance(result, dict) and "_error" in result:
+                failedPlugins.append(pluginName)
+        except Exception:
+            failedPlugins.append(pluginName)
+```
 
-**1. 初始化阶段（INITIALIZER）**：
 - **时机**：框架启动时串行执行
 - **用途**：检查配置、验证API密钥、预加载数据
-- **设计目标**：让事件处理函数可以基于假设运行，避免重复检查，提高效率
-- **失败处理**：初始化失败的插件会被完全移除，因为其处理函数的假设条件无法建立
-
-**2. 事件响应阶段**：
-- **时机**：收到相应事件时并行执行
-- **隔离特性**：独立子进程，完整的资源限制，绝对的错误隔离
-- **监控机制**：实时监控CPU、内存、执行时间，超限自动终止
-
-**3. 定时响应阶段（UNCONDITIONAL）**：
-- **设计哲学**：保持事件-响应模式的一致性，响应人工制造的unconditional事件
-- **调度特性**：整分钟保证而不是精确间隔，让插件可以基于时间做简单判断
-- **间隔机制**：间隔N表示在分钟数能被N整除时执行，而非每隔N分钟执行
+- **失败处理**：初始化失败的插件会被完全移除
 
 ### 资源控制与监控
 
-**多层次资源限制**：
+**资源限制**：
+```python
+def PluginWorker(handler, simpleEvent, rawEvent, resultPipe, memoryLimit):
+    try:
+        # 设置内存限制
+        resource.setrlimit(resource.RLIMIT_AS, (memoryLimit, memoryLimit))
+    except Exception:
+        pass  # Linux专有功能，其他系统跳过
+```
+
 - **CPU时间限制**：防止死循环和计算密集型任务
-- **内存限制**：防止内存泄漏影响系统
+- **内存限制**：防止内存泄漏影响系统  
 - **墙钟时间限制**：防止阻塞调用导致的超时
 
-**实时监控机制**：使用psutil库在主进程中持续监控子进程资源使用情况，一旦发现异常立即采取措施。
+**监控机制**：
+```python
+def PluginMonitor(process, startTime, maxCpuTime, maxWallTime, memoryLimit):
+    try:
+        pluginProcess = psutil.Process(process.pid)
+        cpuTimes = pluginProcess.cpu_times()
+        totalCpuTime = cpuTimes.user + cpuTimes.system
+        
+        if totalCpuTime > maxCpuTime:
+            return f"cpu_time_exceeded ({totalCpuTime:.2f}s > {maxCpuTime}s)"
+        
+        wallTime = time.time() - startTime
+        if wallTime > maxWallTime:
+            return f"wall_time_exceeded ({wallTime:.2f}s > {maxWallTime}s)"
+        
+        memInfo = pluginProcess.memory_info()
+        if memInfo.rss > memoryLimit:
+            memUsageMB = memInfo.rss / (1024 * 1024)
+            memLimitMB = memoryLimit / (1024 * 1024)
+            return f"memory_exceeded ({memUsageMB:.1f}MB > {memLimitMB:.1f}MB)"
+    except psutil.NoSuchProcess:
+        return None
+```
 
-**优雅的错误处理**：
-- **插件级错误隔离**：插件异常不会影响其他插件或主框架
-- **错误转换统一**：插件异常统一转换为None返回值，避免复杂的错误传播
-- **管理员通知可选**：关键错误可配置自动QQ通知管理员
-
-## 性能与稳定性机制
-
-### 性能优化策略
-
-虽然优先考虑稳定性，框架仍在多个层面进行了性能优化：
-
-**前端过滤优化**：通过群消息分类减少不必要的插件调用
-**并行执行优化**：多插件真正并行，充分利用多核性能
-**响应速度优化**：立即响应机制，插件完成即刻处理结果
-**数据库优化**：WAL模式、索引优化、连接复用
-
-**性能期望**：在典型使用场景中（指令机器人、骰娘等），框架的性能表现与协程框架相近。
-
-### 稳定性保障体系
-
-**多层防护机制**：
-- **进程级错误隔离**：最强的错误隔离级别
-- **资源耗尽保护**：防止插件耗尽系统资源
-- **自动故障恢复**：异常插件自动终止，不影响后续执行
-- **紧急控制机制**：mute/unmute管理员命令
-
-**可观测性支持**：
-- **详细日志记录**：所有关键操作都有日志记录
-- **错误通知系统**：可配置的QQ实时通知
-- **执行统计指标**：插件执行时间、成功率等监控数据
-
-## 开发指南与最佳实践
-
-### 插件设计原则
-
-**功能设计**：
-- 保持插件功能单一、职责明确
-- 充分利用INITIALIZER进行预处理和配置检查
-- 合理选择事件类型，避免过度触发
-
-**性能考虑**：
-- 在INITIALIZER中完成耗时的初始化工作
-- 使用ApiCaller进行查询，返回值进行行动
-- 避免长时间阻塞操作和资源密集计算
-
-**稳定性设计**：
-- 假设所有外部调用都可能失败
-- 合理使用try-catch处理异常
-- 通过返回None优雅处理错误情况
-
-### 进阶开发技巧
-
-**扩展事件利用**：理解扩展事件机制，选择合适的事件粒度处理
-
-**历史记录分析**：利用Librarian实现上下文相关的智能回复
-
-**配置驱动设计**：通过配置控制插件行为，在INITIALIZER中建立默认配置
-
-**API组合使用**：结合查询API和返回值API实现复杂交互逻辑
-
-**调试策略**：充分利用日志记录和返回值调试插件行为
-
-## 框架定位与选择指南
-
-### 适合Askr的场景
-
-**学习与原型环境**：
-- 新手开发者学习QQ机器人开发
-- 快速验证想法和功能原型
-
-**稳定性优先场景**：
-- 无法容忍插件错误影响整体服务
-- 需要运行多个不同来源的插件
-- 团队中包含编程新手
-
-### 不适合Askr的场景
-
-**高性能要求场景**：
-- 需要毫秒级响应的高频交互
-- 需要长时间CPU密集计算的任务
-- 严格的实时性响应要求
-
-**复杂应用场景**：
-- 需要插件间复杂交互的应用
-- 复杂的状态管理需求
-- 需要高度定制化的业务逻辑
-
-### 与其他框架的定位差异
-
-**设计理念差异**：
-- **目标用户**：新手开发者，而主流框架面向有经验的开发者
-- **核心价值**：稳定性和易用性，而主流框架注重性能和功能完整性
-- **学习曲线**：平缓渐进，而主流框架通常陡峭但强大
-
-**技术选择对比**：
-- **进程隔离而不是协程**：绝对错误隔离、资源控制，但有性能开销
-- **事件驱动而不是对象模型**：概念简单、接口一致，但功能表达受限
-- **配置内置而不是外部管理**：开箱即用、自动命名空间，但灵活性受限
-
-**选择建议**：
-- **适合选择Askr**：团队有新手、稳定性优先、多插件协作、快速原型需求
-- **可能更适合其他框架**：极致性能需求、复杂业务逻辑、团队技术能力强、高度定制化需求
-
-Askr Framework的价值在于为特定场景和用户群体提供了一个独特的解决方案。它不试图成为最强大或最快的框架，而是专注于成为最适合新手开发者和稳定性优先场景的框架。通过明确的定位和权衡，它在目标领域内提供了卓越的开发体验。
-
-如果你还想了解更多关于插件本身的细节，请参阅[架构细节](architecture.md)
+使用psutil库在主进程中持续监控子进程资源使用情况，一旦发现异常立即采取措施。

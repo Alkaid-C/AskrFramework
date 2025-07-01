@@ -60,9 +60,9 @@
 | 心跳包 | `META_HEARTBEAT` | rawEvent, botContext | 无 |
 | 生命周期 | `META_LIFECYCLE` | rawEvent, botContext | 无 |
 
-**⚠️ 注意**：
+**注意**：
 - **特殊事件**：`INITIALIZER`和`UNCONDITIONAL`是框架内置的特殊事件类型
-- **其他事件**：除非你知道你在做什么，不要监听这些事件类型。它们主要用于框架内部状态监控或特殊用途，不适合一般插件使用
+- **其他事件**：除非你知道你在做什么，不要监听这些事件类型。
 
 ### MANIFEST格式规范
 
@@ -166,7 +166,7 @@ MANIFEST = {"MESSAGE_GROUP": "handle_all_messages"}
 
 **有效的函数声明示例**：
 ```python
-# ✅ 各种有效的参数组合
+#  各种有效的参数组合
 def simple_handler():                           # 无参数（适用于所有事件类型）
 def context_only(botContext):                   # 只需要框架工具
 def event_only(rawEvent):                       # 只需要完整事件数据
@@ -174,7 +174,7 @@ def message_only(simpleEvent):                  # 只处理消息文本
 def full_handler(simpleEvent, rawEvent, botContext):  # 全部参数
 def partial_handler(simpleEvent, botContext):   # 部分参数组合
 
-# ❌ 无效的声明
+#  无效的声明
 def invalid_handler(unknown_param):             # 未知参数名
 ```
 
@@ -272,54 +272,68 @@ def daily_reminder(rawEvent):
 
 ```python
 def my_plugin(botContext):
-    # 查询私聊历史
+    # 基本查询 - 获取最近50条记录
     private_history = botContext["Librarian"](
-        {"type": "private", "user_id": 12345}, 
-        20  # 最近20条记录
+        {"type": "private", "user_id": 12345}
     )
     
-    # 查询群聊历史  
+    # 指定数量查询
     group_history = botContext["Librarian"](
         {"type": "group", "group_id": 67890},
-        50  # 最近50条记录（默认值）
+        eventCount=100  # 最近100条
     )
     
-    # 查询特定事件类型
-    friend_requests = botContext["Librarian"](
-        {"type": "other", "event_type": "REQUEST_FRIEND"},
-        10
+    # 时间窗口查询
+    recent_messages = botContext["Librarian"](
+        {"type": "group", "group_id": 67890},
+        interval=300  # 最近5分钟
+    )
+    
+    # 组合查询 - 时间窗口内的有限数量
+    limited_recent = botContext["Librarian"](
+        {"type": "group", "group_id": 67890},
+        eventCount=50,      # 最多50条
+        interval=600,       # 最近10分钟内
+        intervalMaxCount=200  # interval查询时最多尝试200条
+    )
+    
+    # 格式化输出
+    history_text = botContext["Librarian"](
+        {"type": "private", "user_id": 12345},
+        interval=3600,
+        stringOutput=True  # 返回格式化字符串
     )
 ```
 
-**函数签名**：`Librarian(eventIdentifier: Dict, eventCount: int = 50) -> List[Dict]`
+**函数签名**：
+```python
+Librarian(
+    eventIdentifier: Dict, 
+    eventCount: int = 50,
+    interval: Optional[int] = None,
+    intervalMaxCount: int = 2047,
+    stringOutput: bool = False
+) -> Union[List[Dict], str]
+```
 
 **参数说明**：
 - `eventIdentifier`: 查询条件字典
-  - `{"type": "private", "user_id": QQ号}` - 私聊历史（包括私聊消息、好友添加、戳一戳等与该用户相关的所有事件）
-  - `{"type": "group", "group_id": 群号}` - 群聊历史（包括群消息、群成员变动、群管理操作等与该群相关的所有事件）
-  - `{"type": "other", "event_type": "事件类型"}` - 无法归类到特定用户或群的事件历史
-- `eventCount`: 返回记录数量，默认50，获取最近的N条记录；设置为0时返回全部历史记录
+  - `{"type": "private", "user_id": QQ号}` - 私聊历史
+  - `{"type": "group", "group_id": 群号}` - 群聊历史
+  - `{"type": "other", "event_type": "事件类型"}` - 其他事件历史
+- `eventCount`: 返回记录数量，默认50；设置为0时返回全部
+- `interval`: 时间窗口（秒），查询最近N秒内的事件
+- `intervalMaxCount`: 使用interval时的最大查询数量，默认2047
+- `stringOutput`: 是否返回格式化字符串，默认False
 
-**返回值**：事件列表，每个事件为完整的OneBot 11格式，按时间从旧到新排序
+**返回值**：
+- 默认返回事件列表（List[Dict]），按时间从旧到新排序
+- `stringOutput=True`时返回格式化的多行字符串
 
-**重要说明**：
-- Librarian返回的是**最近的N条记录**，而不是最早的N条
-- 例如：100条历史记录中查询50条 → 返回第51-100条（最新的50条），按时间从旧到新排序
-- **事件分类原则**：能归类到特定群或用户的事件会自动存储到相应的历史中
-  - ✅ 查询群新成员事件：`{"type": "group", "group_id": 群号}`
-  - ❌ 错误方式：`{"type": "other", "event_type": "NOTICE_GROUP_INCREASE"}`
-
-**使用示例**：
-```python
-# 获取最近20条私聊记录（包括消息、好友添加等）
-recent_private = botContext["Librarian"]({"type": "private", "user_id": 12345}, 20)
-
-# 获取群里的所有历史记录（消息、成员变动、管理操作等）
-all_group_history = botContext["Librarian"]({"type": "group", "group_id": 67890}, 0)
-
-# 获取最近的好友请求（无法归类到特定用户的事件）
-friend_requests = botContext["Librarian"]({"type": "other", "event_type": "REQUEST_FRIEND"}, 10)
-```
+**查询策略**：
+- 当提供`interval`参数时，使用二分查询法避免一次加载过多数据
+- 当同时提供`eventCount`和`interval`时，先按时间过滤，再限制数量
+- `intervalMaxCount`防止时间跨度过大导致的性能问题
 
 #### ConfigReader - 配置读取
 
@@ -368,6 +382,66 @@ def my_plugin(botContext):
 - 配置会持久化存储，重启后保持
 - 每个插件拥有独立的配置命名空间
 
+#### CrossOriginConfigReader - 跨域配置读取
+
+```python
+def admin_plugin(botContext):
+    # 读取其他插件的配置（需要privilege权限）
+    target_config = botContext["CrossOriginConfigReader"]("target_plugin")
+    
+    if target_config is None:
+        # 权限不足或读取失败
+        return "无法读取目标插件配置"
+    
+    # 使用获取的配置
+    api_key = target_config.get("api_key", "")
+```
+
+**函数签名**：`CrossOriginConfigReader(target_plugin: str) -> Union[Dict, None]`
+
+**参数说明**：
+- `target_plugin`: 目标插件名（可以带或不带.py后缀）
+
+**返回值**：
+- 成功时返回目标插件的配置字典
+- 权限不足或失败时返回None
+
+**权限要求**：
+- 调用插件必须在`PluginsAccessControl.json`中设置`"privilege": true`
+- 访问会记录INFO级别日志
+
+#### CrossOriginConfigWriter - 跨域配置写入
+
+```python
+def admin_plugin(botContext):
+    # 修改其他插件的配置（需要privilege权限）
+    new_config = {
+        "enabled": False,
+        "reason": "Disabled by admin"
+    }
+    
+    result = botContext["CrossOriginConfigWriter"]("target_plugin", new_config)
+    
+    if result is None:
+        return "权限不足，无法修改配置"
+    
+    return "配置已更新"
+```
+
+**函数签名**：`CrossOriginConfigWriter(target_plugin: str, config: Dict) -> Union[bool, None]`
+
+**参数说明**：
+- `target_plugin`: 目标插件名（可以带或不带.py后缀）
+- `config`: 要写入的配置字典
+
+**返回值**：
+- 成功时返回True
+- 权限不足或失败时返回None
+
+**权限要求**：
+- 调用插件必须在`PluginsAccessControl.json`中设置`"privilege": true`
+- 访问会记录INFO级别日志
+
 #### ApiCaller - API调用
 
 ```python
@@ -411,21 +485,21 @@ def my_plugin(botContext):
 **API分工原则**：
 ```python
 def example_plugin(simpleEvent, botContext):
-    # ✅ 使用ApiCaller查询信息
+    # 使用ApiCaller查询信息
     group_info = botContext["ApiCaller"]("get_group_info", {
         "group_id": simpleEvent["group_id"]
     })
     
     if group_info and group_info.get("member_count", 0) > 50:
-        # ✅ 使用返回值执行行动
+        # 使用返回值执行行动
         return "这是一个大群！"
     
-    # ❌ 不推荐：用ApiCaller执行行动类API
+    # 不推荐：用ApiCaller执行行动类API
     # botContext["ApiCaller"]("send_group_msg", {...})
 ```
 
 **API文档参考**：
-- **ApiCaller支持的API列表**：📖 [OneBot 11 API文档](https://github.com/botuniverse/onebot-11/blob/master/api/public.md)
+- **ApiCaller支持的API列表** [OneBot 11 API文档](https://github.com/botuniverse/onebot-11/blob/master/api/public.md)
 
 ## 返回值规范
 
@@ -650,19 +724,122 @@ def plugin_init(botContext):
         raise
 ```
 
-**避免阻塞操作**：
-```python
-def efficient_handler(simpleEvent, botContext):
-    # ✅ 推荐：使用ApiCaller查询
-    user_info = botContext["ApiCaller"]("get_stranger_info", {
-        "user_id": simpleEvent["user_id"]
-    })
-    
-    if user_info:
-        return f"用户昵称：{user_info.get('nickname', '未知')}"
-    
-    # ❌ 不推荐：在返回值中进行查询（会增加处理复杂度）
 ```
 
 **API文档参考**：
-- **dict返回值的action和data格式**：📖 [OneBot 11 API文档](https://github.com/botuniverse/onebot-11/blob/master/api/public.md)
+- **dict返回值的action和data格式**： [OneBot 11 API文档](https://github.com/botuniverse/onebot-11/blob/master/api/public.md)
+
+## 配置文件格式
+
+### PluginsAccessControl.json
+
+插件访问控制配置文件，控制插件的触发条件和权限。
+
+```json
+{
+  "version": "1.0",
+  "default_policy": "allow",
+  "rules": {
+    "global": {
+      "private": {
+        "BlackList": [999999]
+      },
+      "group": {
+        "BlackList": [666666]
+      },
+      "privilege": false
+    },
+    "admin_plugin.py": {
+      "private": {
+        "WhiteList": [123456, 789012]
+      },
+      "group": {
+        "WhiteList": [111111, 222222]
+      },
+      "privilege": true
+    },
+    "normal_plugin.py": {
+      "private": {},
+      "group": {
+        "WhiteList": [333333]
+      }
+      // 没有privilege字段，使用global默认值
+    }
+  }
+}
+```
+
+**字段说明**：
+
+- **`version`**: 配置文件版本
+- **`default_policy`**: 默认策略，`"allow"`或`"deny"`
+- **`rules`**: 访问规则配置
+  - **`global`**: 全局默认规则
+    - **`private`**: 私聊规则
+      - **`WhiteList`**: 白名单用户QQ号列表
+      - **`BlackList`**: 黑名单用户QQ号列表
+    - **`group`**: 群聊规则
+      - **`WhiteList`**: 白名单群号列表
+      - **`BlackList`**: 黑名单群号列表
+    - **`privilege`**: 是否有跨域配置访问权限
+  - **`插件名.py`**: 插件特定规则（格式同global）
+
+**规则优先级**：
+1. 插件特定规则 > global规则
+2. WhiteList（白名单）> BlackList（黑名单）
+3. 未匹配任何规则时使用`default_policy`
+
+**privilege权限**：
+- 设置为`true`的插件可以使用`CrossOriginConfigReader/Writer`
+- 未设置时使用global的默认值
+- 跨域访问会在日志中记录
+
+### frameworkConfig.json
+
+框架配置文件（可选），用于覆盖默认配置。
+
+```json
+{
+  "version": "1.0",
+  "NAPCAT_SERVER": {
+    "api_url": "http://localhost:3000"
+  },
+  "NAPCAT_LISTEN": {
+    "host": "0.0.0.0",
+    "port": 19218
+  },
+  "PATHS": {
+    "plugins_dir": "./plugins",
+    "database_file": "./EventHistory.db",
+    "access_control": "./PluginsAccessControl.json"
+  },
+  "PLUGIN_EXECUTION": {
+    "max_cpu_time_seconds": 3.0,
+    "max_wall_time_seconds": 30.0,
+    "memory_limit_mb": 1024,
+    "monitor_interval_seconds": 0.1,
+    "process_creation_method": "spawn"
+  },
+  "ADMIN_NOTIFICATION": {
+    "enabled": true,
+    "admin_qq": 123456789,
+    "notify_level": "ERROR",
+    "rate_limit_seconds": 1200,
+    "message_format": "Askr Alert \n[{level}] {time}\n{message}"
+  },
+  "GRACEFUL_SHUTDOWN": {
+    "enabled": true,
+    "max_wait_seconds": 30,
+    "notify_admin_on_shutdown": true
+  },
+  "UNCONDITIONAL_SCHEDULER": {
+    "enabled": true,
+    "self_invoke_key": null
+  }
+}
+```
+
+**说明**：
+- 只需提供要修改的配置项
+- 未提供的配置项使用默认值
+- 配置错误不会阻止框架启动
