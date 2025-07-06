@@ -209,11 +209,11 @@ python askr_framework.py
 
 ## 文档体系
 
-- **[部署指南](Owner_Guide.md)** - 部署配置和管理员功能
-- **[快速教程](Tutorial.md)** - 7个渐进式插件开发教程
-- **[API文档](API_Reference.md)** - 详细的API参考
-- **[技术指南](Technical_Guide.md)** - 高级特性和最佳实践
-- **[架构文档](Architecture.md)** - 框架内部架构说明
+- **[部署指南](docs/Owner_Guide.md)** - 部署配置和管理员功能
+- **[快速教程](docs/Tutorial.md)** - 7个渐进式插件开发教程
+- **[API文档](docs/API_Reference.md)** - 详细的API参考
+- **[技术指南](docs/Technical_Guide.md)** - 高级特性和最佳实践
+- **[架构文档](docs/Architecture.md)** - 框架内部架构说明
 
 ### 示例插件库
 
