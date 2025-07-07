@@ -1,5 +1,14 @@
 # Askr Framework 教程
 
+## 版本信息
+
+适用的框架版本：[Beta 0.2] - *You Asked for This*
+
+文档版本：Beta 0.1.1
+
+最后更新日期：2025-06-08
+
+
 ## 设计理念
 
 Askr Framework基于一个简单而强大的概念：**一切皆事件，一切皆响应**。
