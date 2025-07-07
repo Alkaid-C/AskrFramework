@@ -57,8 +57,8 @@ PLUGIN_REGISTRY = {}  # type: Dict[str, List[Any]]
 
 # Default configuration with sensible values for production use
 CONFIG = {
-    'NAPCAT_SERVER': {'api_url': 'http://localhost:29218'}, 
-    'NAPCAT_LISTEN': {'host': '0.0.0.0', 'port': 19219},
+    'NAPCAT_SERVER': {'api_url': 'http://localhost:19218'}, 
+    'NAPCAT_LISTEN': {'host': 'localhost', 'port': 19219},
     'PATHS': {
         'plugins_dir': './plugins',
         'database_file': './EventHistory.db',
@@ -79,15 +79,10 @@ CONFIG = {
     'ADMIN_NOTIFICATION': {
         'enabled': True,
         'admin_qq': 1804326288,
-        'notify_level': 'INFO',
-        'rate_limit_seconds': 1200,
+        'notify_level': 'WARNING',
+        'rate_limit_seconds': 0,
         'message_format': 'Askr Alert \n[{level}] {time}\n{message}'
-    },
-    'GRACEFUL_SHUTDOWN': {
-        'enabled': True,
-        'max_wait_seconds': 30,
-        'notify_admin_on_shutdown': True
-    },
+    }
 }
 
 # Plugin access control rules
@@ -330,30 +325,7 @@ def ActualInitializer() -> None:
                     else:
                         logger.warning(f"Invalid type for ADMIN_NOTIFICATION.message_format, expected str")
                         AdminNotifier('WARNING', f"Invalid type for ADMIN_NOTIFICATION.message_format, expected str")
-            
-            # GRACEFUL_SHUTDOWN section
-            if 'GRACEFUL_SHUTDOWN' in fileConfig and isinstance(fileConfig['GRACEFUL_SHUTDOWN'], dict):
-                if 'enabled' in fileConfig['GRACEFUL_SHUTDOWN']:
-                    if isinstance(fileConfig['GRACEFUL_SHUTDOWN']['enabled'], bool):
-                        CONFIG['GRACEFUL_SHUTDOWN']['enabled'] = fileConfig['GRACEFUL_SHUTDOWN']['enabled']
-                    else:
-                        logger.warning(f"Invalid type for GRACEFUL_SHUTDOWN.enabled, expected bool")
-                        AdminNotifier('WARNING', f"Invalid type for GRACEFUL_SHUTDOWN.enabled, expected bool")
-                
-                if 'max_wait_seconds' in fileConfig['GRACEFUL_SHUTDOWN']:
-                    value = fileConfig['GRACEFUL_SHUTDOWN']['max_wait_seconds']
-                    if isinstance(value, (int, float)) and value > 0:
-                        CONFIG['GRACEFUL_SHUTDOWN']['max_wait_seconds'] = value
-                    else:
-                        logger.warning(f"Invalid value for GRACEFUL_SHUTDOWN.max_wait_seconds, must be positive number")
-                        AdminNotifier('WARNING', f"Invalid value for GRACEFUL_SHUTDOWN.max_wait_seconds, must be positive number")
-                
-                if 'notify_admin_on_shutdown' in fileConfig['GRACEFUL_SHUTDOWN']:
-                    if isinstance(fileConfig['GRACEFUL_SHUTDOWN']['notify_admin_on_shutdown'], bool):
-                        CONFIG['GRACEFUL_SHUTDOWN']['notify_admin_on_shutdown'] = fileConfig['GRACEFUL_SHUTDOWN']['notify_admin_on_shutdown']
-                    else:
-                        logger.warning(f"Invalid type for GRACEFUL_SHUTDOWN.notify_admin_on_shutdown, expected bool")
-                        AdminNotifier('WARNING', f"Invalid type for GRACEFUL_SHUTDOWN.notify_admin_on_shutdown, expected bool")
+
             
             # Ensure directories exist
             for key, value in CONFIG['PATHS'].items():
@@ -769,10 +741,15 @@ def ActualInitializer() -> None:
         # Remove failed plugins from all registries
         for pluginName in failedPlugins:
             for eventType in PLUGIN_REGISTRY:
-                PLUGIN_REGISTRY[eventType] = [
-                    handler for handler in PLUGIN_REGISTRY[eventType]
-                    if handler.__module__ != pluginName
-                ]
+                correctlyInitalizedHandlers_ = []
+                for entry in PLUGIN_REGISTRY[eventType]:
+                    if isinstance(entry, tuple):
+                        handlerFunction = entry[0]
+                    else:
+                        handlerFunction = entry
+                    if getattr(entry, '__module__', None) != pluginName:
+                        correctlyInitalizedHandlers_.append(entry)
+                PLUGIN_REGISTRY[eventType] = correctlyInitalizedHandlers_
             
             logger.error(f"Removed all functions for failed plugin: {pluginName}")
             AdminNotifier('ERROR', f"Removed all functions for failed plugin: {pluginName}")
@@ -1916,6 +1893,7 @@ def MainDispatcher(rawEvent: Dict) -> None:
     """Main event dispatcher that routes events to appropriate plugins."""
     eventType = EventTypeParser(rawEvent)
     HandlersToExecute_ = []
+    simpleEvent = InbondMessageParser(rawEvent)
     if eventType == "UNEXPECTED":
         return
     
@@ -1925,7 +1903,6 @@ def MainDispatcher(rawEvent: Dict) -> None:
             if currentMinute % interval == 0:
                 HandlersToExecute_.append(handler)     
     else:
-        simpleEvent = InbondMessageParser(rawEvent)
         Historian(rawEvent)
         eventTypesToTrigger_ = [eventType]
         if eventType in EVENT_INHERITANCE:
