@@ -5,7 +5,7 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Python](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![Platform](https://img.shields.io/badge/platform-linux-lightgrey.svg)](https://www.linux.org/)
-[![Version](https://img.shields.io/badge/version-Beta%200.98-orange.svg)](https://github.com/yourusername/askr-framework)
+[![Version](https://img.shields.io/badge/version-Beta%200.2-orange.svg)](https://github.com/yourusername/askr-framework)
 
 ---
 
