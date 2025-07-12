@@ -80,8 +80,12 @@ CONFIG = {
         'enabled': True,
         'admin_qq': 1804326288,
         'notify_level': 'WARNING',
-        'rate_limit_seconds': 0,
         'message_format': 'Askr Alert \n[{level}] {time}\n{message}'
+    },
+    'REMOVE_FAILED_PLUGIN':{
+        'enabled': True,
+        'remove_by_consecutive_or_total_failure': 'consecutive',
+        'count_to_remove': 5
     }
 }
 
@@ -108,9 +112,9 @@ logger = logging.getLogger('AskrFramework')
 # Global state
 IS_MUTED = False
 LOGGING_LEVELS = {'DEBUG': 10, 'INFO': 20, 'WARNING': 30, 'ERROR': 40, 'CRITICAL': 50}
-AdminNotificationLast = {}  # Rate limiting: {messageHash: timestamp}
-AdminNotificationLock = threading.Lock()
 
+
+PLUGIN_FAILURE_COUNT = {}
 # Flask application
 NAPCAT_LISTENER = Flask(__name__)
 
@@ -312,12 +316,8 @@ def ActualInitializer() -> None:
                         AdminNotifier('WARNING', f"Invalid type for ADMIN_NOTIFICATION.notify_level, expected str")
                 
                 if 'rate_limit_seconds' in fileConfig['ADMIN_NOTIFICATION']:
-                    value = fileConfig['ADMIN_NOTIFICATION']['rate_limit_seconds']
-                    if isinstance(value, (int, float)) and value > 0:
-                        CONFIG['ADMIN_NOTIFICATION']['rate_limit_seconds'] = value
-                    else:
-                        logger.warning(f"Invalid value for ADMIN_NOTIFICATION.rate_limit_seconds, must be positive number")
-                        AdminNotifier('WARNING', f"Invalid value for ADMIN_NOTIFICATION.rate_limit_seconds, must be positive number")
+                    logger.warning(f"admin notification rate limit is deprecated. Use remove failed feature instead")
+                    AdminNotifier('WARNING', f"admin notification rate limit is deprecated. Use remove failed feature instead")
                 
                 if 'message_format' in fileConfig['ADMIN_NOTIFICATION']:
                     if isinstance(fileConfig['ADMIN_NOTIFICATION']['message_format'], str):
@@ -325,6 +325,26 @@ def ActualInitializer() -> None:
                     else:
                         logger.warning(f"Invalid type for ADMIN_NOTIFICATION.message_format, expected str")
                         AdminNotifier('WARNING', f"Invalid type for ADMIN_NOTIFICATION.message_format, expected str")
+
+            if 'REMOVE_FAILED_PLUGIN' in fileConfig and isinstance(fileConfig['ADMIN_NOTIFICATION'], dict):
+                if 'enabled' in fileConfig['REMOVE_FAILED_PLUGIN']:
+                    if isinstance(fileConfig['REMOVE_FAILED_PLUGIN']['enabled'], bool):
+                        CONFIG['REMOVE_FAILED_PLUGIN']['enabled'] = fileConfig['REMOVE_FAILED_PLUGIN']['enabled']
+                    else:
+                        logger.warning(f"Invalid type for REMOVE_FAILED_PLUGIN.enabled, expected bool")
+                        AdminNotifier('WARNING', f"Invalid type for REMOVE_FAILED_PLUGIN.enabled, expected bool")
+                if 'remove_by_consecutive_or_total_failure' in fileConfig['REMOVE_FAILED_PLUGIN']:
+                    if fileConfig['REMOVE_FAILED_PLUGIN']['remove_by_consecutive_or_total_failure'] == 'consecutive' or fileConfig['REMOVE_FAILED_PLUGIN']['remove_by_consecutive_or_total_failure'] == 'total':
+                        CONFIG['REMOVE_FAILED_PLUGIN']['remove_by_consecutive_or_total_failure'] = fileConfig['REMOVE_FAILED_PLUGIN']['remove_by_consecutive_or_total_failure']
+                    else:
+                        logger.warning(f"Invalid type for REMOVE_FAILED_PLUGIN.remove_by_consecutive_or_total_failure, expected string \'consecutive\' or \'total\'")
+                        AdminNotifier('WARNING', f"Invalid type for REMOVE_FAILED_PLUGIN.remove_by_consecutive_or_total_failure, expected string \'consecutive\' or \'total\'")
+                if 'count_to_remove' in fileConfig['REMOVE_FAILED_PLUGIN']:
+                    if isinstance(fileConfig['REMOVE_FAILED_PLUGIN']['count_to_remove'], int) and fileConfig['REMOVE_FAILED_PLUGIN']['count_to_remove'] >= 1:
+                        CONFIG['REMOVE_FAILED_PLUGIN']['count_to_remove'] = fileConfig['REMOVE_FAILED_PLUGIN']['count_to_remove']
+                    else:
+                        logger.warning(f"Invalid type for REMOVE_FAILED_PLUGIN.count_to_remove, expected int >= 1")
+                        AdminNotifier('WARNING', f"Invalid type for REMOVE_FAILED_PLUGIN.count_to_remove, expected int >= 1")
 
             
             # Ensure directories exist
@@ -889,61 +909,31 @@ def AdminNotifier(messageLevel: str, message: str) -> None:
     if messageLevel < thresholdLevel:
         return
     
-    def MessageHasher(message: str) -> str:
-        """Generate a short hash of the message for rate limiting."""
-        return hashlib.md5(message.encode('utf-8')).hexdigest()[:8]
-    
-    def AdminNotificationDictCleaner():
-        """Clean up notification records older than 24 hours."""
-        global AdminNotificationLast
-        
-        current_time = time.time()
-        cutoff_time = current_time - 86400  # 24 hours
-        
-        with AdminNotificationLock:
-            AdminNotificationLast = {
-                msg_hash: timestamp 
-                for msg_hash, timestamp in AdminNotificationLast.items()
-                if timestamp > cutoff_time
-            }
-    
     def AdminNotificationSender():
         """Send the actual notification."""
-        global AdminNotificationLast
-        
-        messageHash = MessageHasher(message)
-        currentTime = time.time()
-        rateLimit = CONFIG['ADMIN_NOTIFICATION']['rate_limit_seconds']
-        
-        # Check rate limiting
-        with AdminNotificationLock:
-            lastTime = AdminNotificationLast.get(messageHash, 0)
-            if currentTime - lastTime < rateLimit:
-                return
-            AdminNotificationLast[messageHash] = currentTime
-            try:
-                formattedTime = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                notificationText = CONFIG['ADMIN_NOTIFICATION']['message_format'].format(
-                    level=messageLevel, time=formattedTime, message=message
-                )
-                adminQQ = CONFIG['ADMIN_NOTIFICATION']['admin_qq']
-                requestBody = {
-                    "user_id": adminQQ,
-                    "message": [{"type": "text", "data": {"text": notificationText}}]
-                }
-                
-                baseUrl = CONFIG['NAPCAT_SERVER']['api_url']
-                fullUrl = f"{baseUrl}/send_private_msg"
-                
-                response = requests.post(fullUrl, json=requestBody, timeout=5.0)
-                success = (response.status_code == 200)
-                
-                if not success:
-                    logger.error(f"[AdminNotification] Failed to send notification: HTTP {response.status_code}")
-                
-            except Exception as e:
-                logger.error(f"[AdminNotification] Exception while sending: {e}")
-            AdminNotificationDictCleaner()
+        try:
+            formattedTime = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            notificationText = CONFIG['ADMIN_NOTIFICATION']['message_format'].format(
+                level=messageLevel, time=formattedTime, message=message
+            )
+            adminQQ = CONFIG['ADMIN_NOTIFICATION']['admin_qq']
+            requestBody = {
+                "user_id": adminQQ,
+                "message": [{"type": "text", "data": {"text": notificationText}}]
+            }
+            
+            baseUrl = CONFIG['NAPCAT_SERVER']['api_url']
+            fullUrl = f"{baseUrl}/send_private_msg"
+            
+            response = requests.post(fullUrl, json=requestBody, timeout=5.0)
+            success = (response.status_code == 200)
+            
+            if not success:
+                logger.error(f"[AdminNotification] Failed to send notification: HTTP {response.status_code}")
+            
+        except Exception as e:
+            logger.error(f"[AdminNotification] Exception while sending: {e}")
+
     
     # Execute in background thread
     thread = threading.Thread(target=AdminNotificationSender, daemon=True)
