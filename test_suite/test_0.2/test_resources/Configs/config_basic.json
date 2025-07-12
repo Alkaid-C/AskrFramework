@@ -1,0 +1,10 @@
+{
+  "version": "1.0",
+  "NAPCAT_SERVER": {
+    "api_url": "http://localhost:29218"
+  },
+  "NAPCAT_LISTEN": {
+    "host": "0.0.0.0",
+    "port": 19219
+  }
+}
