@@ -13,8 +13,8 @@ import time
 import resource  # type: ignore
 import psutil  # type: ignore
 from typing import List, Dict, Optional, Union, Any, Callable
-from . import config
-from . import database
+import config
+import database
 
 
 def CheckPluginAccess(handler: Callable, rawEvent: Dict) -> bool:

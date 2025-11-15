@@ -8,7 +8,7 @@ import time
 import datetime
 import sys
 from typing import Dict, List, Union, Optional
-from . import config
+import config
 
 
 def DatabaseInitializer() -> None:
