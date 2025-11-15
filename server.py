@@ -23,6 +23,15 @@ from . import plugin
 NAPCAT_LISTENER = Flask(__name__)
 
 
+@NAPCAT_LISTENER.before_request
+def ensure_initialized():
+    """Ensure framework is initialized before processing any requests.
+    This runs before every request but Initializer() has built-in protection
+    to only initialize once, so there's minimal overhead.
+    """
+    Initializer()
+
+
 @NAPCAT_LISTENER.route('/', methods=['POST'])
 def NapCatListener() -> str:
     """Handle incoming events from NapCat."""
@@ -453,11 +462,9 @@ def MainDispatcher(rawEvent: Dict) -> None:
         plugin.PluginCaller(HandlersToExecute_, simpleEvent, rawEvent, ResponseProcessor)
 
 
-# Initialize framework at module import time
-Initializer()
-
-
 if __name__ == '__main__':
+    # Initialize framework when run directly
+    Initializer()
     try:
         config.logger.info(f"Starting Askr Framework on {config.CONFIG['NAPCAT_LISTEN']['host']}:{config.CONFIG['NAPCAT_LISTEN']['port']}")
         config.AdminNotifier('INFO', f"Starting Askr Framework on {config.CONFIG['NAPCAT_LISTEN']['host']}:{config.CONFIG['NAPCAT_LISTEN']['port']}")

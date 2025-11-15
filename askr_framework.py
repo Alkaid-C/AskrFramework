@@ -71,6 +71,8 @@ MainDispatcher = server.MainDispatcher
 # If this file is run directly, start the server
 if __name__ == '__main__':
     import sys
+    # Initialize framework when run directly
+    Initializer()
     try:
         logger.info(f"Starting Askr Framework on {config.CONFIG['NAPCAT_LISTEN']['host']}:{config.CONFIG['NAPCAT_LISTEN']['port']}")
         config.AdminNotifier('INFO', f"Starting Askr Framework on {config.CONFIG['NAPCAT_LISTEN']['host']}:{config.CONFIG['NAPCAT_LISTEN']['port']}")
