@@ -90,11 +90,8 @@ def DatabaseInitializer() -> None:
         sys.exit(1)
 
 
-def Historian(rawEvent: Dict) -> None:
+def Historian(rawEvent: Dict, eventType: str) -> None:
     """Save event to database for historical queries."""
-    from .server import EventTypeParser  # Import here to avoid circular dependency
-
-    eventType = EventTypeParser(rawEvent)
 
     # Skip high-frequency useless events
     if eventType == "NOTICE_INPUT_STATUS":
@@ -154,11 +151,11 @@ def Historian(rawEvent: Dict) -> None:
     maxRetries = 3
 
     for attempt in range(maxRetries):
+        databaseConnect = None
         try:
             databaseConnect = sqlite3.connect(dbPath, timeout=10.0)
             databaseConnect.execute(insertSql, insertParams)
             databaseConnect.commit()
-            databaseConnect.close()
             return
 
         except sqlite3.OperationalError as e:
@@ -174,6 +171,14 @@ def Historian(rawEvent: Dict) -> None:
             config.logger.error(f"Historian database error for {tableName}: {e}")
             config.AdminNotifier('ERROR', f"Historian database error for {tableName}: {e}")
             return
+
+        finally:
+            if databaseConnect:
+                try:
+                    databaseConnect.close()
+                except Exception as e:
+                    config.logger.warning(f"Historian: Failed to close database connection: {e}")
+                    config.AdminNotifier('WARNING', f"Historian: Failed to close database connection: {e}")
 
 
 def HistoryParser(events: List[Dict]) -> str:
@@ -325,13 +330,15 @@ def SubprocessLibrarian(
         if databaseConnect:
             try:
                 databaseConnect.close()
-            except Exception:
-                pass
+            except Exception as e:
+                config.logger.warning(f"SubprocessLibrarian: Failed to close database connection: {e}")
+                config.AdminNotifier('WARNING', f"SubprocessLibrarian: Failed to close database connection: {e}")
 
 
 def SubprocessConfigReader(pluginName: str) -> Dict:
     """Read plugin configuration from database (subprocess version)."""
     dbPath = config.CONFIG['PATHS']['database_file']
+    databaseConnect = None
 
     try:
         databaseConnect = sqlite3.connect(dbPath, timeout=5.0)
@@ -344,7 +351,6 @@ def SubprocessConfigReader(pluginName: str) -> Dict:
         """, (pluginName,))
 
         row = cursor.fetchone()
-        databaseConnect.close()
 
         if row:
             try:
@@ -362,6 +368,14 @@ def SubprocessConfigReader(pluginName: str) -> Dict:
         config.AdminNotifier('ERROR', f"SubprocessConfigReader error for plugin {pluginName}: {e}")
         return {}
 
+    finally:
+        if databaseConnect:
+            try:
+                databaseConnect.close()
+            except Exception as e:
+                config.logger.warning(f"SubprocessConfigReader: Failed to close database connection: {e}")
+                config.AdminNotifier('WARNING', f"SubprocessConfigReader: Failed to close database connection: {e}")
+
 
 def SubprocessConfigWriter(pluginName: str, config_data: Dict) -> None:
     """Write plugin configuration to database (subprocess version)."""
@@ -378,6 +392,7 @@ def SubprocessConfigWriter(pluginName: str, config_data: Dict) -> None:
 
         maxRetries = 3
         for attempt in range(maxRetries):
+            databaseConnect = None
             try:
                 databaseConnect = sqlite3.connect(dbPath, timeout=10.0)
 
@@ -394,7 +409,6 @@ def SubprocessConfigWriter(pluginName: str, config_data: Dict) -> None:
                 """, (pluginName, configDataJson, pluginName, timestamp, timestamp))
 
                 databaseConnect.commit()
-                databaseConnect.close()
                 return
 
             except sqlite3.OperationalError as e:
@@ -410,6 +424,14 @@ def SubprocessConfigWriter(pluginName: str, config_data: Dict) -> None:
                 config.logger.error(f"ConfigWriter database error for plugin {pluginName}: {e}")
                 config.AdminNotifier('ERROR', f"ConfigWriter database error for plugin {pluginName}: {e}")
                 return
+
+            finally:
+                if databaseConnect:
+                    try:
+                        databaseConnect.close()
+                    except Exception as e:
+                        config.logger.warning(f"SubprocessConfigWriter: Failed to close database connection: {e}")
+                        config.AdminNotifier('WARNING', f"SubprocessConfigWriter: Failed to close database connection: {e}")
 
     except (TypeError, ValueError) as e:
         config.logger.error(f"ConfigWriter: Failed to serialize config for plugin {pluginName}: {e}")

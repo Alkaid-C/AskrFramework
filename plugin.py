@@ -127,10 +127,19 @@ def SubprocessCrossOriginConfigWriter(caller_plugin: str, target_plugin: str, co
     return True
 
 
-def SubprocessApiCaller(action: str, data: Dict) -> Union[Dict, None]:
-    """Call NapCat API from subprocess."""
+def SubprocessApiCaller(caller_plugin: str, action: str, data: Dict) -> Union[Dict, None]:
+    """Call NapCat API from subprocess with privilege check."""
     import requests
     import json
+
+    # Check if caller has privilege
+    if not CheckPluginPrivilege(caller_plugin):
+        config.logger.warning(f"Plugin {caller_plugin} attempted API call without privilege: {action}")
+        config.AdminNotifier('WARNING', f"Plugin {caller_plugin} attempted API call without privilege: {action}")
+        return None
+
+    config.logger.info(f"Plugin {caller_plugin} is calling API: {action}")
+    config.AdminNotifier('INFO', f"Plugin {caller_plugin} is calling API: {action}")
 
     if not isinstance(action, str) or not action:
         config.logger.error("ApiCaller: action must be non-empty string")
@@ -197,13 +206,16 @@ def PluginWorker(handler, simpleEvent: Union[Dict, None], rawEvent: Dict, result
         def CrossOriginConfigWriter(target_plugin: str, config_data: Dict) -> Union[bool, None]:
             return SubprocessCrossOriginConfigWriter(pluginName, target_plugin, config_data)
 
+        def ApiCaller(action: str, data: Dict) -> Union[Dict, None]:
+            return SubprocessApiCaller(pluginName, action, data)
+
         botContext = {
             "Librarian": database.SubprocessLibrarian,
             "ConfigReader": ConfigReader,
             "ConfigWriter": ConfigWriter,
             "CrossOriginConfigReader": CrossOriginConfigReader,
             "CrossOriginConfigWriter": CrossOriginConfigWriter,
-            "ApiCaller": SubprocessApiCaller
+            "ApiCaller": ApiCaller
         }
 
         sig = inspect.signature(handler)
@@ -282,6 +294,7 @@ def PluginCallerSingle(handler, simpleEvent: Union[Dict, None], rawEvent: Dict):
 
         startTime = time.time()
         process.start()
+        childConn.close()  # Parent doesn't need child end - prevent FD leak
 
         monitorInterval = config.CONFIG['PLUGIN_EXECUTION']['monitor_interval_seconds']
 

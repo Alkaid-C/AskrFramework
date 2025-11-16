@@ -2,7 +2,7 @@
 """
 Askr Framework - Server module
 Handles Flask app, event routing, API communication, and main entry point
-Version: Beta 0.98
+Version: Beta 0.2.1
 License: GPL v3
 """
 import json
@@ -26,13 +26,34 @@ NAPCAT_LISTENER = Flask(__name__)
 @NAPCAT_LISTENER.route('/', methods=['POST'])
 def NapCatListener() -> str:
     """Handle incoming events from NapCat."""
-    rawEvent = request.get_json()
-    if AdminDispatcher(rawEvent):
+    try:
+        rawEvent = request.get_json()
+
+        # Validate we received JSON data
+        if rawEvent is None:
+            config.logger.warning("Received POST request with no JSON body or invalid Content-Type")
+            return 'OK'  # Return OK to avoid NapCat retry storms
+
+        # Handle admin commands first
+        if AdminDispatcher(rawEvent):
+            return 'OK'
+
+        # Check mute status
+        if config.IS_MUTED:
+            return 'OK'
+
+        # Dispatch to main handler
+        MainDispatcher(rawEvent)
         return 'OK'
-    if config.IS_MUTED:
+
+    except Exception as e:
+        # Log the error with full traceback
+        config.logger.error(f"Fatal error in NapCatListener: {e}", exc_info=True)
+        config.AdminNotifier('ERROR', f"Fatal error in NapCatListener: {e}")
+
+        # Still return 'OK' to prevent NapCat from retrying
+        # (retrying a broken request will just cause more errors)
         return 'OK'
-    MainDispatcher(rawEvent)
-    return 'OK'
 
 
 @NAPCAT_LISTENER.route('/health', methods=['GET'])
@@ -47,15 +68,15 @@ def HealthCheck() -> dict:
             statusData = statusResponse.json()
             if statusData.get('status', '') == 'ok':
                 NapCatServerStatus = 'OK'
-    except:
-        config.logger.error("Failed to check NapCat server status")
-        config.AdminNotifier('ERROR', "Failed to check NapCat server status")
+    except Exception as e:
+        config.logger.error(f"Failed to check NapCat server status: {e}")
+        config.AdminNotifier('ERROR', f"Failed to check NapCat server status: {e}")
 
     health_status = {
         'status': 'healthy',
         'timestamp': int(time.time()),
         'is_muted': config.IS_MUTED,
-        'version': 'Beta 0.98',
+        'version': 'Beta 0.2.1',
         'NapCatServerStatus': NapCatServerStatus
     }
 
@@ -250,9 +271,8 @@ def EventTypeParser(rawEvent: Dict) -> str:
     return "UNEXPECTED"
 
 
-def InbondMessageParser(rawEvent: Dict) -> Union[Dict, None]:
+def InbondMessageParser(rawEvent: Dict, eventType: str) -> Union[Dict, None]:
     """Parse incoming message event to extract simple event data."""
-    eventType = EventTypeParser(rawEvent)
 
     match eventType:
         case "MESSAGE_PRIVATE":
@@ -413,7 +433,7 @@ def MainDispatcher(rawEvent: Dict) -> None:
     """Main event dispatcher that routes events to appropriate plugins."""
     eventType = EventTypeParser(rawEvent)
     HandlersToExecute_ = []
-    simpleEvent = InbondMessageParser(rawEvent)
+    simpleEvent = InbondMessageParser(rawEvent, eventType)
     if eventType == "UNEXPECTED":
         return
 
@@ -423,7 +443,7 @@ def MainDispatcher(rawEvent: Dict) -> None:
             if currentMinute % interval == 0:
                 HandlersToExecute_.append(handler)
     else:
-        database.Historian(rawEvent)
+        database.Historian(rawEvent, eventType)
         eventTypesToTrigger_ = [eventType]
         if eventType in config.EVENT_INHERITANCE:
             eventTypesToTrigger_.extend(config.EVENT_INHERITANCE[eventType])
