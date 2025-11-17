@@ -1,0 +1,38 @@
+{
+    "version": "1.0",
+    "NAPCAT_SERVER": {
+        "api_url": "http://localhost:19218"
+    },
+    "NAPCAT_LISTEN": {
+        "host": "localhost",
+        "port": 19219
+    },
+    "PATHS": {
+        "plugins_dir": "./plugins",
+        "database_file": "./EventHistory.db",
+        "access_control": "./PluginsAccessControl.json"
+    },
+    "HTTP": {
+        "max_retries": 3,
+        "timeout_seconds": 10,
+        "status_check_timeout": 5
+    },
+    "PLUGIN_EXECUTION": {
+        "max_cpu_time_seconds": 3.0,
+        "max_wall_time_seconds": 30.0,
+        "memory_limit_mb": 1024,
+        "monitor_interval_seconds": 0.1,
+        "process_creation_method": "spawn"
+    },
+    "ADMIN_NOTIFICATION": {
+        "enabled": true,
+        "admin_qq": 1804326288,
+        "notify_level": "WARNING",
+        "message_format": "Askr Alert \n[{level}] {time}\n{message}"
+    },
+    "REMOVE_FAILED_PLUGIN": {
+        "enabled": true,
+        "remove_by_consecutive_or_total_failure": "consecutive",
+        "count_to_remove": 5
+    }
+}

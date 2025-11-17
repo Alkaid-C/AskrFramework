@@ -19,9 +19,7 @@ import database
 
 def CheckPluginAccess(handler: Callable, rawEvent: Dict) -> bool:
     """Check if a plugin handler has access to the event."""
-    pluginName = getattr(handler, '__module__', 'unknown')
-    if not pluginName.endswith('.py'):
-        pluginName += '.py'
+    pluginName = handler.pluginName
 
     groupID = rawEvent.get('group_id')
 
@@ -96,6 +94,83 @@ def CheckPluginPrivilege(pluginName: str) -> bool:
     # Fall back to global default
     global_rules = all_rules.get('global', {})
     return global_rules.get('privilege', False)
+
+
+def UpdateFailureCount(pluginName: str, success: bool) -> None:
+    """
+    Update plugin failure count and remove plugin if threshold exceeded.
+
+    Args:
+        pluginName: Name of the plugin (e.g., "plugin.py")
+        success: True if plugin succeeded, False if failed
+    """
+    # Fast exit if feature disabled
+    if not config.CONFIG['REMOVE_FAILED_PLUGIN']['enabled']:
+        return
+
+    if success:
+        # Fast path: Check if count exists and is non-zero (no lock needed)
+        if pluginName not in config.PLUGIN_FAILURE_COUNT:
+            return  # Never failed, nothing to reset
+
+        if config.PLUGIN_FAILURE_COUNT[pluginName]["consecutive"] == 0:
+            return  # Already at 0, nothing to do
+
+        # Slow path: Reset consecutive count
+        with config.PLUGIN_FAILURE_LOCK:
+            if pluginName in config.PLUGIN_FAILURE_COUNT:
+                config.PLUGIN_FAILURE_COUNT[pluginName]["consecutive"] = 0
+
+    else:  # Failure
+        with config.PLUGIN_FAILURE_LOCK:
+            # Initialize if first failure
+            if pluginName not in config.PLUGIN_FAILURE_COUNT:
+                config.PLUGIN_FAILURE_COUNT[pluginName] = {"consecutive": 0, "total": 0}
+
+            # Increment counters
+            config.PLUGIN_FAILURE_COUNT[pluginName]["consecutive"] += 1
+            config.PLUGIN_FAILURE_COUNT[pluginName]["total"] += 1
+
+            # Check removal threshold
+            mode = config.CONFIG['REMOVE_FAILED_PLUGIN']['remove_by_consecutive_or_total_failure']
+            threshold = config.CONFIG['REMOVE_FAILED_PLUGIN']['count_to_remove']
+            count = config.PLUGIN_FAILURE_COUNT[pluginName][mode]
+
+            if count >= threshold:
+                config.logger.error(f"Plugin {pluginName} reached {count} {mode} failures (threshold: {threshold}), removing all handlers")
+                config.AdminNotifier('ERROR', f"Plugin {pluginName} reached {count} {mode} failures (threshold: {threshold}), removing all handlers")
+                RemoveFailedPlugin(pluginName)
+
+
+def RemoveFailedPlugin(pluginName: str) -> None:
+    """
+    Remove all handlers for a failed plugin from PLUGIN_REGISTRY.
+
+    Note: Does NOT remove from PLUGIN_FAILURE_COUNT - that serves as historical record.
+    Counter dict can be inspected to see which plugins have been removed and why.
+
+    Args:
+        pluginName: Name of the plugin to remove (e.g., "plugin.py")
+    """
+    removed_count = 0
+
+    for eventType in list(config.PLUGIN_REGISTRY.keys()):
+        oldList = config.PLUGIN_REGISTRY[eventType]
+        newList = []
+
+        for entry in oldList:
+            # Handle both regular handlers and UNCONDITIONAL tuples (handler, interval)
+            handler = entry[0] if isinstance(entry, tuple) else entry
+            if getattr(handler, 'pluginName', None) != pluginName:
+                newList.append(entry)
+            else:
+                removed_count += 1
+
+        # Atomic list replacement - safe for concurrent reads
+        config.PLUGIN_REGISTRY[eventType] = newList
+
+    config.logger.error(f"Removed {removed_count} handlers for failed plugin: {pluginName}")
+    config.AdminNotifier('ERROR', f"Removed {removed_count} handlers for failed plugin: {pluginName}")
 
 
 def SubprocessCrossOriginConfigReader(caller_plugin: str, target_plugin: str) -> Union[Dict, None]:
@@ -382,6 +457,9 @@ def PluginCaller(
 
     def executePluginThread(handler, handlerIndex):
         """Execute plugin in thread and handle result."""
+        pluginName = getattr(handler, 'pluginName', 'unknown')
+        success = False
+
         try:
             result = PluginCallerSingle(handler, simpleEvent, rawEvent)
 
@@ -390,12 +468,17 @@ def PluginCaller(
                 config.logger.error(f"Plugin {handler.__name__} raised {result['_type']}: {result['_error']}")
                 config.AdminNotifier('ERROR', f"Plugin {handler.__name__} raised {result['_type']}: {result['_error']}")
                 result = None
+            else:
+                success = True  # Plugin succeeded (returned non-error result)
 
             resultQueue.put((handlerIndex, handler, result))
         except Exception as e:
             config.logger.error(f"Thread execution error for plugin {handler.__name__}: {e}")
             config.AdminNotifier('ERROR', f"Thread execution error for plugin {handler.__name__}: {e}")
             resultQueue.put((handlerIndex, handler, None))
+        finally:
+            # Track failure regardless of exception path
+            UpdateFailureCount(pluginName, success)
 
     # Start all plugin threads
     threads = []
@@ -519,6 +602,7 @@ def RegistryInitializer() -> None:
                                     f"Allowed parameters are: {allowedParams}")
                         continue
 
+                    handlerFunction.pluginName = pluginFile
                     INITIALIZER_REGISTRY.append((handlerFunction, moduleName))
                     config.logger.info(f"Registered {moduleName}.{functionName} for INITIALIZER event")
                     config.AdminNotifier('INFO', f"Registered {moduleName}.{functionName} for INITIALIZER event")
@@ -569,6 +653,7 @@ def RegistryInitializer() -> None:
                         continue
 
                     # Register in both registries
+                    handlerFunction.pluginName = pluginFile
                     config.PLUGIN_REGISTRY["UNCONDITIONAL"].append((handlerFunction, interval))
                     config.logger.info(f"Registered {moduleName}.{handlerName} for UNCONDITIONAL event (interval: {interval})")
                     config.AdminNotifier('INFO', f"Registered {moduleName}.{handlerName} for UNCONDITIONAL event (interval: {interval})")
@@ -603,6 +688,7 @@ def RegistryInitializer() -> None:
                                 f"Allowed parameters are: {allowedParams}")
                     continue
 
+                handlerFunction.pluginName = pluginFile
                 config.PLUGIN_REGISTRY[eventType].append(handlerFunction)
                 config.logger.info(f"Registered {moduleName}.{functionName} for event '{eventType}'")
                 config.AdminNotifier('INFO', f"Registered {moduleName}.{functionName} for event '{eventType}'")

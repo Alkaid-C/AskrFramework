@@ -453,8 +453,7 @@ def MainDispatcher(rawEvent: Dict) -> None:
 
         for triggerType in eventTypesToTrigger_:
             handlerList_ = config.PLUGIN_REGISTRY.get(triggerType, [])
-            for handler in handlerList_:
-                matchedHandlers_.add(handler)
+            matchedHandlers_.update(handlerList_)  # Atomic - add all at once
 
         # Apply access control filtering
         for handler in matchedHandlers_:

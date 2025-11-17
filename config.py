@@ -95,6 +95,7 @@ logger = logging.getLogger('AskrFramework')
 IS_MUTED = False
 LOGGING_LEVELS = {'DEBUG': 10, 'INFO': 20, 'WARNING': 30, 'ERROR': 40, 'CRITICAL': 50}
 PLUGIN_FAILURE_COUNT = {}
+PLUGIN_FAILURE_LOCK = threading.Lock()  # Protects PLUGIN_FAILURE_COUNT updates
 
 # Configuration file path
 FRAMEWORK_CONFIG_FILE = './frameworkConfig.json'
@@ -187,16 +188,18 @@ def FrameworkConfigReader() -> None:
                 if isinstance(fileConfig['NAPCAT_LISTEN']['host'], str):
                     CONFIG['NAPCAT_LISTEN']['host'] = fileConfig['NAPCAT_LISTEN']['host']
                 else:
-                    logger.critical(f"Configuration file contains invalid type for NAPCAT_LISTEN.host, expected str, using default.")
-                    AdminNotifier('CRITICAL', f"Configuration file contains invalid type for NAPCAT_LISTEN.host, expected str, using default.")
+                    logger.critical(f"Configuration file contains invalid type for NAPCAT_LISTEN.host, expected str")
+                    AdminNotifier('CRITICAL', f"Configuration file contains invalid type for NAPCAT_LISTEN.host, expected str")
+                    sys.exit(1)
 
             if 'port' in fileConfig['NAPCAT_LISTEN']:
                 port = fileConfig['NAPCAT_LISTEN']['port']
                 if isinstance(port, int) and 1 <= port <= 65535:
                     CONFIG['NAPCAT_LISTEN']['port'] = port
                 else:
-                    logger.critical(f"Configuration file contains invalid value for NAPCAT_LISTEN.port, must be int between 1-65535, using default.")
-                    AdminNotifier('CRITICAL', f"Configuration file contains invalid value for NAPCAT_LISTEN.port, must be int between 1-65535, using default.")
+                    logger.critical(f"Configuration file contains invalid value for NAPCAT_LISTEN.port, must be int between 1-65535")
+                    AdminNotifier('CRITICAL', f"Configuration file contains invalid value for NAPCAT_LISTEN.port, must be int between 1-65535")
+                    sys.exit(1)
 
         # PATHS section
         if 'PATHS' in fileConfig and isinstance(fileConfig['PATHS'], dict):
@@ -207,6 +210,7 @@ def FrameworkConfigReader() -> None:
                     else:
                         logger.critical(f"Configuration file contains invalid type for PATHS.{key}, expected str")
                         AdminNotifier('CRITICAL', f"Configuration file contains invalid type for PATHS.{key}, expected str")
+                        sys.exit(1)
 
         # HTTP section
         if 'HTTP' in fileConfig and isinstance(fileConfig['HTTP'], dict):

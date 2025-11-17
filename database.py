@@ -97,10 +97,6 @@ def Historian(rawEvent: Dict, eventType: str) -> None:
     if eventType == "NOTICE_INPUT_STATUS":
         return
 
-    # Don't store internal unconditional events
-    if eventType == "UNCONDITIONAL":
-        return
-
     timestamp = int(time.time())
     eventData = json.dumps(rawEvent, ensure_ascii=False)
 
