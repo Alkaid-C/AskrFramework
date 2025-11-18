@@ -1,0 +1,694 @@
+[
+  {
+    "testname": "event_dispatch_test",
+    "plugins": ["plugin_test1_1.py", "plugin_test1_2.py"],
+    "configs": ["config_basic"],
+    "extra_wait_seconds": 65,
+    "events_to_send": [
+      {
+        "delay": 100,
+        "event": {
+          "post_type": "message",
+          "message_type": "private",
+          "sub_type": "friend",
+          "message_id": 1001,
+          "user_id": 12345678,
+          "message": [{"type": "text", "data": {"text": "test private message"}}],
+          "raw_message": "test private message",
+          "font": 0,
+          "sender": {
+            "user_id": 12345678,
+            "nickname": "TestUser",
+            "sex": "unknown",
+            "age": 0
+          },
+          "time": 1700000001,
+          "self_id": 88888888
+        }
+      },
+      {
+        "delay": 100,
+        "event": {
+          "post_type": "message",
+          "message_type": "group",
+          "sub_type": "normal",
+          "message_id": 1002,
+          "group_id": 987654321,
+          "user_id": 12345678,
+          "anonymous": null,
+          "message": [{"type": "text", "data": {"text": "test group message"}}],
+          "raw_message": "test group message",
+          "font": 0,
+          "sender": {
+            "user_id": 12345678,
+            "nickname": "TestUser",
+            "card": "",
+            "sex": "unknown",
+            "age": 0,
+            "area": "",
+            "level": "1",
+            "role": "member",
+            "title": ""
+          },
+          "time": 1700000002,
+          "self_id": 88888888
+        }
+      },
+      {
+        "delay": 100,
+        "event": {
+          "post_type": "message",
+          "message_type": "group",
+          "sub_type": "normal",
+          "message_id": 1003,
+          "group_id": 987654321,
+          "user_id": 12345678,
+          "anonymous": null,
+          "message": [
+            {"type": "at", "data": {"qq": "88888888"}},
+            {"type": "text", "data": {"text": " test mention"}}
+          ],
+          "raw_message": "@88888888 test mention",
+          "font": 0,
+          "sender": {
+            "user_id": 12345678,
+            "nickname": "TestUser",
+            "card": "",
+            "sex": "unknown",
+            "age": 0,
+            "area": "",
+            "level": "1",
+            "role": "member",
+            "title": ""
+          },
+          "time": 1700000003,
+          "self_id": 88888888
+        }
+      },
+      {
+        "delay": 100,
+        "event": {
+          "post_type": "message",
+          "message_type": "group",
+          "sub_type": "normal",
+          "message_id": 1004,
+          "group_id": 987654321,
+          "user_id": 12345678,
+          "anonymous": null,
+          "message": [{"type": "text", "data": {"text": "/test command"}}],
+          "raw_message": "/test command",
+          "font": 0,
+          "sender": {
+            "user_id": 12345678,
+            "nickname": "TestUser",
+            "card": "",
+            "sex": "unknown",
+            "age": 0,
+            "area": "",
+            "level": "1",
+            "role": "member",
+            "title": ""
+          },
+          "time": 1700000004,
+          "self_id": 88888888
+        }
+      },
+      {
+        "delay": 100,
+        "event": {
+          "post_type": "message_sent",
+          "message_type": "private",
+          "sub_type": "friend",
+          "message_id": 1005,
+          "user_id": 12345678,
+          "message": [{"type": "text", "data": {"text": "test sent private"}}],
+          "raw_message": "test sent private",
+          "font": 0,
+          "sender": {
+            "user_id": 88888888,
+            "nickname": "Bot",
+            "sex": "unknown",
+            "age": 0
+          },
+          "time": 1700000005,
+          "self_id": 88888888
+        }
+      },
+      {
+        "delay": 100,
+        "event": {
+          "post_type": "message_sent",
+          "message_type": "group",
+          "sub_type": "normal",
+          "message_id": 1006,
+          "group_id": 987654321,
+          "user_id": 88888888,
+          "message": [{"type": "text", "data": {"text": "test sent group"}}],
+          "raw_message": "test sent group",
+          "font": 0,
+          "sender": {
+            "user_id": 88888888,
+            "nickname": "Bot",
+            "card": "",
+            "sex": "unknown",
+            "age": 0,
+            "area": "",
+            "level": "1",
+            "role": "member",
+            "title": ""
+          },
+          "time": 1700000006,
+          "self_id": 88888888
+        }
+      },
+      {
+        "delay": 100,
+        "event": {
+          "post_type": "notice",
+          "notice_type": "friend_add",
+          "user_id": 12345678,
+          "time": 1700000007,
+          "self_id": 88888888
+        }
+      },
+      {
+        "delay": 100,
+        "event": {
+          "post_type": "notice",
+          "notice_type": "friend_recall",
+          "user_id": 12345678,
+          "message_id": 1001,
+          "time": 1700000008,
+          "self_id": 88888888
+        }
+      },
+      {
+        "delay": 100,
+        "event": {
+          "post_type": "notice",
+          "notice_type": "group_recall",
+          "group_id": 987654321,
+          "user_id": 12345678,
+          "operator_id": 87654321,
+          "message_id": 1002,
+          "time": 1700000009,
+          "self_id": 88888888
+        }
+      },
+      {
+        "delay": 100,
+        "event": {
+          "post_type": "notice",
+          "notice_type": "group_increase",
+          "sub_type": "approve",
+          "group_id": 987654321,
+          "operator_id": 87654321,
+          "user_id": 12345678,
+          "time": 1700000010,
+          "self_id": 88888888
+        }
+      },
+      {
+        "delay": 100,
+        "event": {
+          "post_type": "notice",
+          "notice_type": "group_decrease",
+          "sub_type": "leave",
+          "group_id": 987654321,
+          "operator_id": 12345678,
+          "user_id": 12345678,
+          "time": 1700000011,
+          "self_id": 88888888
+        }
+      },
+      {
+        "delay": 100,
+        "event": {
+          "post_type": "notice",
+          "notice_type": "group_admin",
+          "sub_type": "set",
+          "group_id": 987654321,
+          "user_id": 12345678,
+          "time": 1700000012,
+          "self_id": 88888888
+        }
+      },
+      {
+        "delay": 100,
+        "event": {
+          "post_type": "notice",
+          "notice_type": "group_ban",
+          "sub_type": "ban",
+          "group_id": 987654321,
+          "operator_id": 87654321,
+          "user_id": 12345678,
+          "duration": 600,
+          "time": 1700000013,
+          "self_id": 88888888
+        }
+      },
+      {
+        "delay": 100,
+        "event": {
+          "post_type": "notice",
+          "notice_type": "group_upload",
+          "group_id": 987654321,
+          "user_id": 12345678,
+          "file": {
+            "id": "file123",
+            "name": "test.txt",
+            "size": 1024,
+            "busid": 0
+          },
+          "time": 1700000014,
+          "self_id": 88888888
+        }
+      },
+      {
+        "delay": 100,
+        "event": {
+          "post_type": "notice",
+          "notice_type": "group_card",
+          "group_id": 987654321,
+          "user_id": 12345678,
+          "card_new": "NewCard",
+          "card_old": "OldCard",
+          "time": 1700000015,
+          "self_id": 88888888
+        }
+      },
+      {
+        "delay": 100,
+        "event": {
+          "post_type": "notice",
+          "notice_type": "essence",
+          "sub_type": "add",
+          "group_id": 987654321,
+          "sender_id": 12345678,
+          "operator_id": 87654321,
+          "message_id": 1002,
+          "time": 1700000016,
+          "self_id": 88888888
+        }
+      },
+      {
+        "delay": 100,
+        "event": {
+          "post_type": "notice",
+          "notice_type": "group_msg_emoji_like",
+          "group_id": 987654321,
+          "user_id": 12345678,
+          "message_id": 1002,
+          "likes": [
+            {
+              "emoji_id": "1",
+              "count": 1
+            }
+          ],
+          "time": 1700000017,
+          "self_id": 88888888
+        }
+      },
+      {
+        "delay": 100,
+        "event": {
+          "post_type": "notice",
+          "notice_type": "bot_offline",
+          "reason": "network",
+          "time": 1700000018,
+          "self_id": 88888888
+        }
+      },
+      {
+        "delay": 100,
+        "event": {
+          "post_type": "notice",
+          "notice_type": "notify",
+          "sub_type": "group_name",
+          "group_id": 987654321,
+          "user_id": 87654321,
+          "name": "NewGroupName",
+          "time": 1700000019,
+          "self_id": 88888888
+        }
+      },
+      {
+        "delay": 100,
+        "event": {
+          "post_type": "notice",
+          "notice_type": "notify",
+          "sub_type": "title",
+          "group_id": 987654321,
+          "user_id": 12345678,
+          "title": "NewTitle",
+          "time": 1700000020,
+          "self_id": 88888888
+        }
+      },
+      {
+        "delay": 100,
+        "event": {
+          "post_type": "notice",
+          "notice_type": "notify",
+          "sub_type": "poke",
+          "group_id": 987654321,
+          "user_id": 12345678,
+          "target_id": 88888888,
+          "time": 1700000021,
+          "self_id": 88888888
+        }
+      },
+      {
+        "delay": 100,
+        "event": {
+          "post_type": "notice",
+          "notice_type": "notify",
+          "sub_type": "profile_like",
+          "user_id": 12345678,
+          "time": 1700000022,
+          "self_id": 88888888
+        }
+      },
+      {
+        "delay": 100,
+        "event": {
+          "post_type": "notice",
+          "notice_type": "notify",
+          "sub_type": "input_status",
+          "status_text": "typing",
+          "event_type": 1,
+          "user_id": 12345678,
+          "time": 1700000023,
+          "self_id": 88888888
+        }
+      },
+      {
+        "delay": 100,
+        "event": {
+          "post_type": "request",
+          "request_type": "friend",
+          "user_id": 12345678,
+          "comment": "加我好友吧",
+          "flag": "flag_friend_123",
+          "time": 1700000024,
+          "self_id": 88888888
+        }
+      },
+      {
+        "delay": 100,
+        "event": {
+          "post_type": "request",
+          "request_type": "group",
+          "sub_type": "add",
+          "group_id": 987654321,
+          "user_id": 12345678,
+          "comment": "请让我加入",
+          "flag": "flag_group_123",
+          "time": 1700000025,
+          "self_id": 88888888
+        }
+      },
+      {
+        "delay": 100,
+        "event": {
+          "post_type": "meta_event",
+          "meta_event_type": "heartbeat",
+          "time": 1700000026,
+          "self_id": 88888888,
+          "status": {
+            "online": true,
+            "good": true
+          },
+          "interval": 5000
+        }
+      },
+      {
+        "delay": 100,
+        "event": {
+          "post_type": "meta_event",
+          "meta_event_type": "lifecycle",
+          "sub_type": "enable",
+          "time": 1700000027,
+          "self_id": 88888888
+        }
+      }
+    ],
+    "expected_responses": [
+      {"action": "send_private_msg", "data": {"user_id": 99999999, "message": [{"type": "text", "data": {"text": "MESSAGE_PRIVATE received"}}]}},
+      {"action": "send_private_msg", "data": {"user_id": 99999999, "message": [{"type": "text", "data": {"text": "MESSAGE_GROUP received"}}]}},
+      {"action": "send_private_msg", "data": {"user_id": 99999999, "message": [{"type": "text", "data": {"text": "MESSAGE_GROUP received"}}]}},
+      {"action": "send_private_msg", "data": {"user_id": 99999999, "message": [{"type": "text", "data": {"text": "MESSAGE_GROUP_MENTION received"}}]}},
+      {"action": "send_private_msg", "data": {"user_id": 99999999, "message": [{"type": "text", "data": {"text": "MESSAGE_GROUP received"}}]}},
+      {"action": "send_private_msg", "data": {"user_id": 99999999, "message": [{"type": "text", "data": {"text": "MESSAGE_GROUP_BOT received"}}]}},
+      {"action": "send_private_msg", "data": {"user_id": 99999999, "message": [{"type": "text", "data": {"text": "MESSAGE_SENT_PRIVATE received"}}]}},
+      {"action": "send_private_msg", "data": {"user_id": 99999999, "message": [{"type": "text", "data": {"text": "MESSAGE_SENT_GROUP received"}}]}},
+      {"action": "send_private_msg", "data": {"user_id": 99999999, "message": [{"type": "text", "data": {"text": "NOTICE_FRIEND_ADD received"}}]}},
+      {"action": "send_private_msg", "data": {"user_id": 99999999, "message": [{"type": "text", "data": {"text": "NOTICE_FRIEND_RECALL received"}}]}},
+      {"action": "send_private_msg", "data": {"user_id": 99999999, "message": [{"type": "text", "data": {"text": "NOTICE_GROUP_RECALL received"}}]}},
+      {"action": "send_private_msg", "data": {"user_id": 99999999, "message": [{"type": "text", "data": {"text": "NOTICE_GROUP_INCREASE received"}}]}},
+      {"action": "send_private_msg", "data": {"user_id": 99999999, "message": [{"type": "text", "data": {"text": "NOTICE_GROUP_DECREASE received"}}]}},
+      {"action": "send_private_msg", "data": {"user_id": 99999999, "message": [{"type": "text", "data": {"text": "NOTICE_GROUP_ADMIN received"}}]}},
+      {"action": "send_private_msg", "data": {"user_id": 99999999, "message": [{"type": "text", "data": {"text": "NOTICE_GROUP_BAN received"}}]}},
+      {"action": "send_private_msg", "data": {"user_id": 99999999, "message": [{"type": "text", "data": {"text": "NOTICE_GROUP_UPLOAD received"}}]}},
+      {"action": "send_private_msg", "data": {"user_id": 99999999, "message": [{"type": "text", "data": {"text": "NOTICE_GROUP_CARD received"}}]}},
+      {"action": "send_private_msg", "data": {"user_id": 99999999, "message": [{"type": "text", "data": {"text": "NOTICE_ESSENCE received"}}]}},
+      {"action": "send_private_msg", "data": {"user_id": 99999999, "message": [{"type": "text", "data": {"text": "NOTICE_GROUP_MSG_EMOJI_LIKE received"}}]}},
+      {"action": "send_private_msg", "data": {"user_id": 99999999, "message": [{"type": "text", "data": {"text": "NOTICE_GROUP_NAME received"}}]}},
+      {"action": "send_private_msg", "data": {"user_id": 99999999, "message": [{"type": "text", "data": {"text": "NOTICE_GROUP_TITLE received"}}]}},
+      {"action": "send_private_msg", "data": {"user_id": 99999999, "message": [{"type": "text", "data": {"text": "NOTICE_POKE received"}}]}},
+      {"action": "send_private_msg", "data": {"user_id": 99999999, "message": [{"type": "text", "data": {"text": "NOTICE_PROFILE_LIKE received"}}]}},
+      {"action": "send_private_msg", "data": {"user_id": 99999999, "message": [{"type": "text", "data": {"text": "REQUEST_GROUP received"}}]}},
+      {"action": "send_private_msg", "data": {"user_id": 99999999, "message": [{"type": "text", "data": {"text": "META_HEARTBEAT received"}}]}},
+      {"action": "send_private_msg", "data": {"user_id": 99999999, "message": [{"type": "text", "data": {"text": "META_LIFECYCLE received"}}]}},
+      {"action": "send_private_msg", "data": {"user_id": 99999999, "message": [{"type": "text", "data": {"text": "UNCONDITIONAL received"}}]}},
+      {"action": "send_private_msg", "data": {"user_id": 12345678, "message": [{"type": "text", "data": {"text": "MESSAGE_PRIVATE string response"}}]}},
+      {"action": "send_group_msg", "data": {"group_id": 987654321, "message": [{"type": "text", "data": {"text": "MESSAGE_GROUP string response"}}]}},
+      {"action": "send_group_msg", "data": {"group_id": 987654321, "message": [{"type": "text", "data": {"text": "MESSAGE_GROUP_MENTION string response"}}]}},
+      {"action": "send_group_msg", "data": {"group_id": 987654321, "message": [{"type": "text", "data": {"text": "MESSAGE_GROUP_BOT string response"}}]}},
+      {"action": "send_private_msg", "data": {"user_id": 12345678, "message": [{"type": "text", "data": {"text": "NOTICE_FRIEND_ADD string response"}}]}},
+      {"action": "send_private_msg", "data": {"user_id": 12345678, "message": [{"type": "text", "data": {"text": "NOTICE_FRIEND_RECALL string response"}}]}},
+      {"action": "send_group_msg", "data": {"group_id": 987654321, "message": [{"type": "text", "data": {"text": "NOTICE_GROUP_RECALL string response"}}]}},
+      {"action": "send_group_msg", "data": {"group_id": 987654321, "message": [{"type": "text", "data": {"text": "NOTICE_GROUP_INCREASE string response"}}]}},
+      {"action": "send_group_msg", "data": {"group_id": 987654321, "message": [{"type": "text", "data": {"text": "NOTICE_GROUP_DECREASE string response"}}]}},
+      {"action": "send_group_msg", "data": {"group_id": 987654321, "message": [{"type": "text", "data": {"text": "NOTICE_GROUP_ADMIN string response"}}]}},
+      {"action": "send_group_msg", "data": {"group_id": 987654321, "message": [{"type": "text", "data": {"text": "NOTICE_GROUP_BAN string response"}}]}},
+      {"action": "send_group_msg", "data": {"group_id": 987654321, "message": [{"type": "text", "data": {"text": "NOTICE_GROUP_UPLOAD string response"}}]}},
+      {"action": "send_group_msg", "data": {"group_id": 987654321, "message": [{"type": "text", "data": {"text": "NOTICE_GROUP_CARD string response"}}]}},
+      {"action": "send_group_msg", "data": {"group_id": 987654321, "message": [{"type": "text", "data": {"text": "NOTICE_ESSENCE string response"}}]}},
+      {"action": "send_group_msg", "data": {"group_id": 987654321, "message": [{"type": "text", "data": {"text": "NOTICE_GROUP_MSG_EMOJI_LIKE string response"}}]}},
+      {"action": "send_group_msg", "data": {"group_id": 987654321, "message": [{"type": "text", "data": {"text": "NOTICE_GROUP_NAME string response"}}]}},
+      {"action": "send_group_msg", "data": {"group_id": 987654321, "message": [{"type": "text", "data": {"text": "NOTICE_GROUP_TITLE string response"}}]}},
+      {"action": "send_group_msg", "data": {"group_id": 987654321, "message": [{"type": "text", "data": {"text": "NOTICE_POKE string response"}}]}},
+      {"action": "send_private_msg", "data": {"user_id": 12345678, "message": [{"type": "text", "data": {"text": "NOTICE_PROFILE_LIKE string response"}}]}},
+      {"action": "send_group_msg", "data": {"group_id": 987654321, "message": [{"type": "text", "data": {"text": "REQUEST_GROUP string response"}}]}}
+    ]
+  },
+  {
+    "testname": "botcontext_test",
+    "plugins": ["plugin_test2_1.py"],
+    "configs": ["config_basic"],
+    "extra_wait_seconds": 5,
+    "events_to_send": [
+      {
+        "delay": 100,
+        "event": {
+          "post_type": "message",
+          "message_type": "private",
+          "sub_type": "friend",
+          "message_id": 2001,
+          "user_id": 12345678,
+          "message": [{"type": "text", "data": {"text": "History message 1"}}],
+          "raw_message": "History message 1",
+          "font": 0,
+          "sender": {
+            "user_id": 12345678,
+            "nickname": "TestUser",
+            "sex": "unknown",
+            "age": 0
+          },
+          "time": 1700000001,
+          "self_id": 88888888
+        }
+      },
+      {
+        "delay": 100,
+        "event": {
+          "post_type": "message",
+          "message_type": "private",
+          "sub_type": "friend",
+          "message_id": 2002,
+          "user_id": 12345678,
+          "message": [{"type": "text", "data": {"text": "History message 2"}}],
+          "raw_message": "History message 2",
+          "font": 0,
+          "sender": {
+            "user_id": 12345678,
+            "nickname": "TestUser",
+            "sex": "unknown",
+            "age": 0
+          },
+          "time": 1700000002,
+          "self_id": 88888888
+        }
+      },
+      {
+        "delay": 100,
+        "event": {
+          "post_type": "message",
+          "message_type": "private",
+          "sub_type": "friend",
+          "message_id": 2003,
+          "user_id": 12345678,
+          "message": [{"type": "text", "data": {"text": "History message 3"}}],
+          "raw_message": "History message 3",
+          "font": 0,
+          "sender": {
+            "user_id": 12345678,
+            "nickname": "TestUser",
+            "sex": "unknown",
+            "age": 0
+          },
+          "time": 1700000003,
+          "self_id": 88888888
+        }
+      },
+      {
+        "delay": 1000,
+        "event": {
+          "post_type": "message",
+          "message_type": "private",
+          "sub_type": "friend",
+          "message_id": 2004,
+          "user_id": 12345678,
+          "message": [{"type": "text", "data": {"text": "TEST_CONFIG_WRITE"}}],
+          "raw_message": "TEST_CONFIG_WRITE",
+          "font": 0,
+          "sender": {
+            "user_id": 12345678,
+            "nickname": "TestUser",
+            "sex": "unknown",
+            "age": 0
+          },
+          "time": 1700000004,
+          "self_id": 88888888
+        }
+      },
+      {
+        "delay": 100,
+        "event": {
+          "post_type": "message",
+          "message_type": "private",
+          "sub_type": "friend",
+          "message_id": 2005,
+          "user_id": 12345678,
+          "message": [{"type": "text", "data": {"text": "TEST_CONFIG_READ"}}],
+          "raw_message": "TEST_CONFIG_READ",
+          "font": 0,
+          "sender": {
+            "user_id": 12345678,
+            "nickname": "TestUser",
+            "sex": "unknown",
+            "age": 0
+          },
+          "time": 1700000005,
+          "self_id": 88888888
+        }
+      },
+      {
+        "delay": 100,
+        "event": {
+          "post_type": "message",
+          "message_type": "private",
+          "sub_type": "friend",
+          "message_id": 2006,
+          "user_id": 12345678,
+          "message": [{"type": "text", "data": {"text": "TEST_LIBRARIAN_COUNT"}}],
+          "raw_message": "TEST_LIBRARIAN_COUNT",
+          "font": 0,
+          "sender": {
+            "user_id": 12345678,
+            "nickname": "TestUser",
+            "sex": "unknown",
+            "age": 0
+          },
+          "time": 1700000006,
+          "self_id": 88888888
+        }
+      },
+      {
+        "delay": 5000,
+        "event": {
+          "post_type": "message",
+          "message_type": "private",
+          "sub_type": "friend",
+          "message_id": 2007,
+          "user_id": 12345678,
+          "message": [{"type": "text", "data": {"text": "TEST_LIBRARIAN_TIME"}}],
+          "raw_message": "TEST_LIBRARIAN_TIME",
+          "font": 0,
+          "sender": {
+            "user_id": 12345678,
+            "nickname": "TestUser",
+            "sex": "unknown",
+            "age": 0
+          },
+          "time": 1700000010,
+          "self_id": 88888888
+        }
+      },
+      {
+        "delay": 100,
+        "event": {
+          "post_type": "message",
+          "message_type": "private",
+          "sub_type": "friend",
+          "message_id": 2008,
+          "user_id": 12345678,
+          "message": [{"type": "text", "data": {"text": "TEST_LIST_CORRECT"}}],
+          "raw_message": "TEST_LIST_CORRECT",
+          "font": 0,
+          "sender": {
+            "user_id": 12345678,
+            "nickname": "TestUser",
+            "sex": "unknown",
+            "age": 0
+          },
+          "time": 1700000011,
+          "self_id": 88888888
+        }
+      },
+      {
+        "delay": 100,
+        "event": {
+          "post_type": "message",
+          "message_type": "private",
+          "sub_type": "friend",
+          "message_id": 2009,
+          "user_id": 12345678,
+          "message": [{"type": "text", "data": {"text": "TEST_LIST_ERROR"}}],
+          "raw_message": "TEST_LIST_ERROR",
+          "font": 0,
+          "sender": {
+            "user_id": 12345678,
+            "nickname": "TestUser",
+            "sex": "unknown",
+            "age": 0
+          },
+          "time": 1700000012,
+          "self_id": 88888888
+        }
+      }
+    ],
+    "expected_responses": [
+      {"action": "send_private_msg", "data": {"user_id": 12345678, "message": [{"type": "text", "data": {"text": "ConfigWriter success: test_key=test_value"}}]}},
+      {"action": "send_private_msg", "data": {"user_id": 12345678, "message": [{"type": "text", "data": {"text": "ConfigReader result: test_key=test_value"}}]}},
+      {"action": "send_private_msg", "data": {"user_id": 12345678, "message": [{"type": "text", "data": {"text": "Librarian count: found 6 messages"}}]}},
+      {"action": "send_private_msg", "data": {"user_id": 12345678, "message": [{"type": "text", "data": {"text": "Librarian time: found 1 messages in last 3 seconds"}}]}},
+      {"action": "send_private_msg", "data": {"user_id": 12345678, "message": [{"type": "text", "data": {"text": "First message from list"}}]}},
+      {"action": "send_private_msg", "data": {"user_id": 12345678, "message": [{"type": "text", "data": {"text": "Second message from list"}}]}},
+      {"action": "send_group_msg", "data": {"group_id": 123456789, "message": [{"type": "text", "data": {"text": "Third message from list"}}]}},
+      {"action": "send_private_msg", "data": {"user_id": 12345678, "message": [{"type": "text", "data": {"text": "Valid string in error list"}}]}},
+      {"action": "send_group_msg", "data": {"group_id": 123456789, "message": [{"type": "text", "data": {"text": "Another valid message"}}]}}
+    ]
+  }
+]
