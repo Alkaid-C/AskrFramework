@@ -5,7 +5,7 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Python](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![Platform](https://img.shields.io/badge/platform-linux-lightgrey.svg)](https://www.linux.org/)
-[![Version](https://img.shields.io/badge/version-Beta%200.2-orange.svg)](https://github.com/yourusername/askr-framework)
+[![Version](https://img.shields.io/badge/version-Beta%200.3-orange.svg)](https://github.com/yourusername/askr-framework)
 
 ---
 
@@ -184,7 +184,7 @@ pip install flask requests psutil
 
 **!!!重要!!!** 配置NapCat时需要：
 - 设置HTTP上报地址为Askr Framework的监听地址（默认：`http://localhost:19219`）
-- 设置HTTP API地址供Askr Framework调用（默认：`http://localhost:3000`）
+- 设置HTTP API地址供Askr Framework调用（默认：`http://localhost:19218`）
 
 ### 3. 创建第一个插件
 
@@ -266,6 +266,37 @@ python askr_framework.py
 
     1. 根据上述代码变化更新了相关文档。
     2. 新增部署指南，整理框架部署者所需的关键信息。
+
+* 2025-11-18 [Beta 0.3] -  *I think moods are for people with choices and children—*
+
+  * **破坏性变更**：
+    1. `botContext["ApiCaller"]` 现在需要插件具有 `privilege` 权限才能调用。请在 `PluginsAccessControl.json` 中为需要调用 API 的插件设置 `"privilege": true`。
+    1. 删除了在之前版本中实际上无法正常工作的 Admin Notification 的 rate_limit_seconds 配置项。
+
+  * **计划中的破坏性变更**：
+
+    1. 插件 `MANIFEST` 中的 `UNCONDITIONAL` 事件将不再支持自定义执行间隔，所有插件将按默认间隔唤醒。
+       原因：执行间隔的主要优势在于潜在的性能优化，但评估表明其实际提升有限，因为大多数性能瓶颈来自消息类事件。同时，该特性增加了框架和插件代码的复杂度。
+
+  * 功能更新：
+
+    1. 新增 `REMOVE_FAILED_PLUGIN` 配置，支持自动移除连续或累计失败次数过多的插件，防止问题插件持续消耗系统资源。
+    2. 管理员通知现包含插件失败统计信息。
+
+  * 漏洞修复：
+
+    1. 修复了当插件异常退出时部分资源未能及时释放的错误。
+    1. 其他代码质量的微小提升。
+  
+  * 架构修改：
+  
+    无
+  
+  * 文档更改：
+  
+    1. 根据上述代码变化更新了相关文档。
+    2. 新增 NapCatDocs，从 OneBot-11、NapCat 等多个来源总结了 NapCat 暴露的 API 接口和下发的 event 事件。
+
 
 ---
 

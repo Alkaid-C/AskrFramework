@@ -2,11 +2,11 @@
 
 ## 版本信息
 
-适用的框架版本：[Beta 0.2] - *You Asked for This*
+适用的框架版本：[Beta 0.3] - *I think moods are for people with choices and children—*
 
-文档版本：Beta 0.1.1
+文档版本：Beta 0.3
 
-最后更新日期：2025-06-08
+最后更新日期：2025-11-18
 
 
 ## 设计理念

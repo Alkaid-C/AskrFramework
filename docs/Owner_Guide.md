@@ -4,11 +4,11 @@
 
 ## 版本信息
 
-适用的框架版本：[Beta 0.2] - *You Asked for This*
+适用的框架版本：[Beta 0.3] - *I think moods are for people with choices and children—*
 
-文档版本：Beta 0.2.1
+文档版本：Beta 0.3
 
-最后更新日期：2025-07-07
+最后更新日期：2025-11-18
 
 
 ---
@@ -92,9 +92,8 @@ curl http://localhost:19219/health
 {
   "status": "healthy",
   "timestamp": 1703123456,
-  "active_plugins": 2,
   "is_muted": false,
-  "version": "Beta 0.98",
+  "version": "Beta 0.3",
   "NapCatServerStatus": "OK"
 }
 ```
@@ -140,8 +139,12 @@ curl http://localhost:19219/health
     "enabled": true,
     "admin_qq": 123456789,
     "notify_level": "ERROR",
-    "rate_limit_seconds": 1200,
     "message_format": "Askr Alert \n[{level}] {time}\n{message}"
+  },
+  "REMOVE_FAILED_PLUGIN": {
+    "enabled": true,
+    "remove_by_consecutive_or_total_failure": "consecutive",
+    "count_to_remove": 5
   }
 }
 ```
@@ -176,8 +179,12 @@ curl http://localhost:19219/health
 - `enabled`：是否启用管理员通知
 - `admin_qq`：管理员QQ号
 - `notify_level`：通知级别（DEBUG/INFO/WARNING/ERROR/CRITICAL）
-- `rate_limit_seconds`：相同消息的通知间隔（秒）
 - `message_format`：通知消息格式模板
+
+**REMOVE_FAILED_PLUGIN**
+- `enabled`：是否启用失败插件自动移除功能
+- `remove_by_consecutive_or_total_failure`：移除判定方式，`"consecutive"`（连续失败）或`"total"`（累计失败）
+- `count_to_remove`：触发移除的失败次数阈值
 
 #### 配置注意事项
 
@@ -288,11 +295,14 @@ curl http://localhost:19219/health
 4. **框架关闭**：收到关闭信号时（如果启用）
 5. **自定义日志**：插件使用logging模块记录的相应级别日志
 
-### 防刷屏机制
+### 失败插件自动移除
 
-- 相同消息在`rate_limit_seconds`时间内只通知一次
-- 默认1200秒（20分钟）
-- 基于消息内容的hash值判断是否相同
+当插件反复失败时，框架会自动将其从注册表中移除：
+
+- **连续失败模式**（`consecutive`）：插件连续失败N次后移除，成功执行一次会重置计数
+- **累计失败模式**（`total`）：插件累计失败N次后移除，不会重置
+
+默认配置为连续失败5次后移除。此机制替代了旧版本的通知防刷屏功能，能更有效地防止问题插件对系统造成持续影响。
 
 ### 管理员命令
 

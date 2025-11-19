@@ -4,11 +4,11 @@
 
 ## 版本信息
 
-适用的框架版本：[Beta 0.2] - *You Asked for This*
+适用的框架版本：[Beta 0.3] - *I think moods are for people with choices and children—*
 
-文档版本：Beta 0.2.1
+文档版本：Beta 0.3
 
-最后更新日期：2025-07-07
+最后更新日期：2025-11-18
 
 
 ## MANIFEST声明规范
@@ -483,7 +483,12 @@ def my_plugin(botContext):
 
 **返回值**：
 - 成功时返回API响应的data字段（Dict类型）
-- 失败时返回None（网络错误、超时、API错误等）
+- 失败时返回None（网络错误、超时、API错误、权限不足等）
+
+**权限要求**：
+- 调用插件必须在`PluginsAccessControl.json`中设置`"privilege": true`
+- 无权限时返回None并记录WARNING级别日志
+- 所有API调用会记录INFO级别日志
 
 **使用建议**：
 - 主要用于查询类API，获取数据用于决策
@@ -833,17 +838,12 @@ def plugin_init(botContext):
     "enabled": true,
     "admin_qq": 123456789,
     "notify_level": "ERROR",
-    "rate_limit_seconds": 1200,
     "message_format": "Askr Alert \n[{level}] {time}\n{message}"
   },
-  "GRACEFUL_SHUTDOWN": {
+  "REMOVE_FAILED_PLUGIN": {
     "enabled": true,
-    "max_wait_seconds": 30,
-    "notify_admin_on_shutdown": true
-  },
-  "UNCONDITIONAL_SCHEDULER": {
-    "enabled": true,
-    "self_invoke_key": null
+    "remove_by_consecutive_or_total_failure": "consecutive",
+    "count_to_remove": 5
   }
 }
 ```

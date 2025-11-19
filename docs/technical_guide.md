@@ -2,7 +2,7 @@
 
 **面向高级插件开发者和框架设计关注者的深度技术指南**
 
-适用版本：[Beta 0.2] - *You Asked for This*
+适用版本：[Beta 0.3] - *I think moods are for people with choices and children—*
 
 ## 设计哲学与核心理念
 
@@ -472,3 +472,70 @@ def PluginMonitor(process, startTime, maxCpuTime, maxWallTime, memoryLimit):
 ```
 
 使用psutil库在主进程中持续监控子进程资源使用情况，一旦发现异常立即采取措施。
+
+### 插件失败追踪与自动移除
+
+框架维护插件执行的失败统计，并支持自动移除问题插件：
+
+**失败计数机制**：
+```python
+PLUGIN_FAILURE_COUNT = {}            # 累计失败次数
+PLUGIN_CONSECUTIVE_FAILURE_COUNT = {}  # 连续失败次数
+
+def PluginCallerSingle(handler, simpleEvent, rawEvent):
+    pluginName = handler.__module__
+    result = ... # 执行插件
+
+    if isinstance(result, dict) and "_error" in result:
+        # 执行失败
+        PLUGIN_FAILURE_COUNT[pluginName] = PLUGIN_FAILURE_COUNT.get(pluginName, 0) + 1
+        PLUGIN_CONSECUTIVE_FAILURE_COUNT[pluginName] = PLUGIN_CONSECUTIVE_FAILURE_COUNT.get(pluginName, 0) + 1
+    else:
+        # 执行成功，重置连续失败计数
+        PLUGIN_CONSECUTIVE_FAILURE_COUNT[pluginName] = 0
+```
+
+**自动移除策略**：
+
+通过`frameworkConfig.json`中的`REMOVE_FAILED_PLUGIN`配置控制：
+
+```json
+{
+  "REMOVE_FAILED_PLUGIN": {
+    "enabled": true,
+    "remove_by_consecutive_or_total_failure": "consecutive",
+    "count_to_remove": 5
+  }
+}
+```
+
+- **enabled**：启用/禁用自动移除功能
+- **remove_by_consecutive_or_total_failure**：
+  - `"consecutive"`：连续失败达到阈值时移除
+  - `"total"`：累计失败达到阈值时移除
+- **count_to_remove**：触发移除的失败次数阈值
+
+**移除执行**：
+```python
+def RemovePluginFromRegistry(pluginName):
+    for eventType in PLUGIN_REGISTRY:
+        PLUGIN_REGISTRY[eventType] = [
+            handler for handler in PLUGIN_REGISTRY[eventType]
+            if handler.__module__ != pluginName
+        ]
+
+    AdminNotifier("WARNING", f"插件 {pluginName} 因失败次数过多已被移除")
+```
+
+当插件被移除时：
+1. 从所有事件类型的registry中移除该插件的处理函数
+2. 向管理员发送通知，说明移除原因和失败统计
+3. 插件文件保留，但在当前运行期间不再执行
+
+**设计考量**：
+
+- **连续失败策略**：适用于偶发错误可接受的场景，插件成功执行一次即重置计数
+- **累计失败策略**：适用于要求高可靠性的场景，任何失败都被计入
+- **手动恢复**：重启框架后插件会重新加载，适合在修复问题后恢复服务
+
+此功能确保单个问题插件不会持续消耗系统资源，同时保持框架的整体稳定性。

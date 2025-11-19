@@ -4,17 +4,39 @@
 
 ## 版本信息
 
-适用的框架版本：[Beta 0.2] - *You Asked for This*
+适用的框架版本：[Beta 0.3] - *I think moods are for people with choices and children—*
 
-文档版本：Beta 0.2.1
+文档版本：Beta 0.3
 
-最后更新日期：2025-07-07
+最后更新日期：2025-11-18
 
 
 
 ## 1. 系统概览
 
 Askr Framework 是一个基于事件驱动的 QQ 机器人框架，采用"框架多线程 + 插件多进程"的混合架构设计。
+
+### 代码结构
+
+框架采用单文件设计，所有核心功能集中在 `askr_framework.py` 中（约 2100 行）：
+
+```
+askr_framework.py
+├── IMPORTS                    # 标准库和第三方库导入
+├── CONSTANTS & GLOBALS        # 常量定义和全局变量
+├── CONFIGURATION              # 配置读取和验证函数
+├── DATABASE                   # 数据库操作函数
+├── PLUGIN MANAGEMENT          # 插件加载、执行、监控函数
+├── EVENT HANDLING             # 事件解析、分发、响应函数
+├── INITIALIZATION             # 框架初始化函数
+└── FLASK APP                  # Flask 应用和路由定义
+```
+
+这种单文件设计的优势：
+- 简化部署和分发
+- 消除循环导入问题
+- 便于理解整体架构
+- 符合框架"让复杂的事情变简单"的设计理念
 
 ### 核心架构图
 
@@ -124,6 +146,24 @@ NapCatListener() ─────────────→ /health endpoint
   4. 注册到相应的 registry
   5. 执行 INITIALIZER 函数
   6. 移除失败的插件
+
+### 3.5 插件失败追踪
+
+框架通过 `REMOVE_FAILED_PLUGIN` 配置自动管理问题插件：
+
+**全局变量**:
+- `PLUGIN_FAILURE_COUNT`: 记录每个插件的失败次数
+- `PLUGIN_CONSECUTIVE_FAILURE_COUNT`: 记录每个插件的连续失败次数
+
+**移除策略**:
+- `consecutive`: 连续失败达到阈值时移除
+- `total`: 累计失败达到阈值时移除
+
+**行为**:
+1. 插件执行成功时重置连续失败计数
+2. 插件执行失败时增加失败计数
+3. 达到阈值时从所有 registry 中移除插件
+4. 发送管理员通知告知移除原因
 
 **`UnconditionalEventInitializer() -> None`**
 - **功能**: 启动无条件事件生成器线程
@@ -315,6 +355,10 @@ MainDispatcher(rawEvent)
 ### 配置存储
 - `CONFIG`: 运行时配置字典
 - `PLUGIN_ACCESS_RULES`: 访问控制规则
+
+### 插件失败追踪
+- `PLUGIN_FAILURE_COUNT`: 插件累计失败次数
+- `PLUGIN_CONSECUTIVE_FAILURE_COUNT`: 插件连续失败次数
 
 ### 管理员系统
 - `IS_MUTED`: 全局静音状态
