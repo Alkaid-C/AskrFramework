@@ -38,10 +38,7 @@ class TestRunner:
 
         # 框架核心文件路径
         self.framework_files = [
-            "askr_framework.py",
-            "config.py",
-            "database.py",
-            "plugin.py"
+            "askr_framework.py"
         ]
         self.project_root = project_root
 

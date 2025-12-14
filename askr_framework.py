@@ -253,9 +253,9 @@ def FrameworkConfigReader() -> None:
                     value = fileConfig['PLUGIN_EXECUTION'][key]
                     if isinstance(value, (int, float)) and value > 0:
                         CONFIG['PLUGIN_EXECUTION'][key] = value
-                        if value > 50:
-                            logger.warning(f"PLUGIN_EXECUTION.{key} is set to more than 50 seconds, which may cause problems with UNCONDITIONAL events.")
-                            AdminNotifier('WARNING', f"PLUGIN_EXECUTION.{key} is set to more than 50 seconds, which may cause problems with UNCONDITIONAL events.")
+                        if value > 45:
+                            logger.warning(f"PLUGIN_EXECUTION.{key} is set to more than 45 seconds, which may cause problems with UNCONDITIONAL events.")
+                            AdminNotifier('WARNING', f"PLUGIN_EXECUTION.{key} is set to more than 45 seconds, which may cause problems with UNCONDITIONAL events.")
                     else:
                         logger.error(f"Invalid value for PLUGIN_EXECUTION.{key}, must be positive number")
                         AdminNotifier('ERROR', f"Invalid value for PLUGIN_EXECUTION.{key}, must be positive number")
@@ -2029,7 +2029,9 @@ def UnconditionalEventGenerator() -> None:
 
         try:
             url = f"http://localhost:{CONFIG['NAPCAT_LISTEN']['port']}/"
-            response = requests.post(url, json=unconditional_event, timeout=5.0)
+            # Timeout must exceed max_wall_time + overhead to allow all plugins to complete
+            unconditional_timeout = CONFIG['PLUGIN_EXECUTION']['max_wall_time_seconds'] + 10.0
+            response = requests.post(url, json=unconditional_event, timeout=unconditional_timeout)
             if response.status_code != 200:
                 logger.error(f"Failed to send unconditional event: HTTP {response.status_code}")
                 AdminNotifier('ERROR', f"Failed to send unconditional event: HTTP {response.status_code}")
@@ -2106,4 +2108,6 @@ def HealthCheck() -> dict:
 
 # Initialize framework when module is imported by Gunicorn/Uvicorn
 # This ensures plugins are loaded and background services are started
-Initializer()
+# Skip initialization in child processes to avoid multiprocessing spawn errors
+if multiprocessing.current_process().name == 'MainProcess':
+    Initializer()
